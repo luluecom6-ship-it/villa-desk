@@ -41,7 +41,8 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
-    "menuSignOut": "Sair"
+    "menuSignOut": "Sair",
+    "stays": "Stays"
   },
   "Header": {
     "dashboard": "Painel",
@@ -58,7 +59,8 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
-    "menuSignOut": "Sair"
+    "menuSignOut": "Sair",
+    "stays": "Stays"
   },
   "ModeToggle": {
     "switchMode": "Mudar para o modo {mode}"
@@ -2714,6 +2716,184 @@
       "submitFailed": "Falha ao enviar o modelo.",
       "metaApiStatus": "Erro da API da Meta: {status}",
       "syncFailed": "Falha ao sincronizar os modelos"
+    }
+  },
+  "Stays": {
+    "title": "Stays",
+    "subtitle": "Registrations, guest forms and check-in automation for the villa.",
+    "newRegistration": "New registration",
+    "searchPlaceholder": "Search name, mobile, reference or booking ID",
+    "searchAllNote": "Searching all stays, including cancelled ones.",
+    "filters": {
+      "label": "Filter stays",
+      "all": "All",
+      "arrivals_today": "Arrivals today",
+      "departures_today": "Departures today",
+      "in_house": "In house",
+      "upcoming": "Upcoming",
+      "form_pending": "Form pending",
+      "id_pending": "ID not verified",
+      "cancelled": "Cancelled"
+    },
+    "columns": {
+      "reference": "Reference",
+      "guest": "Guest",
+      "mobile": "Mobile",
+      "checkin": "Check-in",
+      "checkout": "Check-out",
+      "form": "Form",
+      "id": "ID",
+      "automation": "Automation",
+      "noMobile": "No mobile"
+    },
+    "empty": {
+      "title": "No stays here yet",
+      "hint": "Create a registration to get a Stay Reference and the guest form link.",
+      "noMatches": "No stays match your search"
+    },
+    "status": {
+      "draft": "Draft",
+      "registered": "Registered",
+      "checked_in": "Checked in",
+      "checked_out": "Checked out",
+      "cancelled": "Cancelled",
+      "sample": "Sample"
+    },
+    "automation": {
+      "on": "On",
+      "off": "Off",
+      "reason": {
+        "cancelled": "Stay cancelled",
+        "sample": "Sample stay",
+        "no_mobile": "Add a mobile number",
+        "paused": "Paused by staff",
+        "closed": "Stay closed"
+      }
+    },
+    "idStatus": {
+      "none": "No ID yet",
+      "pending": "Not verified",
+      "verified": "Verified",
+      "rejected": "Rejected"
+    },
+    "formStatus": {
+      "pending": "Form pending",
+      "submitted": "Form submitted"
+    },
+    "source": {
+      "airbnb": "Airbnb",
+      "booking_com": "Booking.com",
+      "makemytrip": "MakeMyTrip",
+      "goibibo": "Goibibo",
+      "direct": "Direct",
+      "other": "Other"
+    },
+    "form": {
+      "newTitle": "New registration",
+      "editTitle": "Edit stay details",
+      "newDescription": "Creates the Stay Reference and the guest form link. Add a mobile number to switch automatic messages on.",
+      "editDescription": "Changes apply straight away. Adding or removing the mobile number switches automation on or off.",
+      "guestName": "Guest name",
+      "mobile": "Mobile (WhatsApp)",
+      "countryCode": "Country code",
+      "mobileHint": "Automatic messages go only to this number.",
+      "mobileDraftHint": "Without a mobile number this is saved as a draft and automation stays off.",
+      "checkin": "Check-in",
+      "checkout": "Check-out",
+      "guests": "Number of guests",
+      "source": "Booking source",
+      "bookingRef": "Platform booking reference",
+      "bookingRefHint": "Optional. Any format, for example HMABCD1234 or 4821937465.",
+      "email": "Email (optional)",
+      "notes": "Notes",
+      "cancel": "Cancel",
+      "save": "Save changes",
+      "create": "Create registration"
+    },
+    "created": {
+      "title": "Registration created",
+      "description": "{name} now has a Stay Reference and a guest form.",
+      "reference": "Stay Reference",
+      "formLink": "Guest form link",
+      "automationOn": "Automation is on for this stay.",
+      "automationOff": "Automation is off until a mobile number is added.",
+      "copyLink": "Copy link",
+      "copied": "Copied",
+      "sendWhatsApp": "Send form on WhatsApp",
+      "needsMobile": "Add a mobile number first"
+    },
+    "drawer": {
+      "loading": "Loading",
+      "automation": "Automatic messages",
+      "pause": "Pause automation",
+      "automationHelp": "Messages go only to the mobile number on this stay, and only while the stay is registered.",
+      "addMobilePlaceholder": "Mobile number",
+      "addMobile": "Add mobile",
+      "details": "Stay details",
+      "edit": "Edit",
+      "mobile": "Mobile",
+      "email": "Email",
+      "checkin": "Check-in",
+      "checkout": "Check-out",
+      "guests": "Guests",
+      "source": "Source",
+      "bookingRef": "Booking ref",
+      "notes": "Notes",
+      "guestForm": "Guest form",
+      "openForm": "Open guest form",
+      "guestsAndIds": "Guests and IDs",
+      "noGuestsYet": "The guest has not filled in the form yet.",
+      "lead": "Lead guest",
+      "adult": "Adult",
+      "child": "Child",
+      "formC": "Form C required",
+      "idFiles": "{count, plural, =1 {1 ID file uploaded} other {# ID files uploaded}}",
+      "houseRules": "House rules",
+      "signedBy": "Signed by",
+      "signedAt": "Signed at",
+      "rulesVersion": "Rules version",
+      "ip": "IP address",
+      "notAccepted": "Not accepted yet.",
+      "cancelStay": "Cancel this stay",
+      "cancelHelp": "Cancelling stops all messages. The record and any files are kept."
+    },
+    "cancel": {
+      "title": "Cancel this stay?",
+      "description": "Automatic messages stop and the stay is hidden from the default list. The record and any files are kept, and this cannot be undone here.",
+      "keep": "Keep stay",
+      "confirm": "Cancel stay"
+    },
+    "toast": {
+      "saveFailed": "Could not save the stay",
+      "updated": "Stay updated",
+      "copyFailed": "Could not copy the link",
+      "loadFailed": "Could not load stays",
+      "paused": "Automation paused",
+      "resumed": "Automation resumed",
+      "mobileSaved": "Mobile number saved. Automation is on.",
+      "cancelled": "Stay cancelled"
+    },
+    "errors": {
+      "invalidJson": "Invalid request body",
+      "fixFields": "Please fix the highlighted fields",
+      "nameRequired": "Guest name is required",
+      "nameTooLong": "Guest name is too long",
+      "invalidPhone": "Enter a valid mobile number",
+      "invalidEmail": "Enter a valid email address",
+      "checkinInvalid": "Enter a valid check-in date and time",
+      "checkoutInvalid": "Enter a valid check-out date and time",
+      "checkoutBeforeCheckin": "Check-out must be after check-in",
+      "guestsInvalid": "Guests must be between 1 and 30",
+      "sourceInvalid": "Choose a booking source",
+      "refTooLong": "Booking reference is too long (100 characters maximum)",
+      "notesTooLong": "Notes are too long",
+      "nothingToUpdate": "Nothing to update",
+      "createFailed": "Could not create the stay",
+      "updateFailed": "Could not update the stay",
+      "phoneInUse": "Another active stay already uses this mobile number",
+      "duplicateBookingRef": "Another stay from this source has the same booking reference. Saved anyway.",
+      "notFound": "Stay not found",
+      "stayLocked": "This stay is closed and can no longer be edited"
     }
   }
 }

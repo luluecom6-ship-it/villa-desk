@@ -36,6 +36,11 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
 
 ## Status
 
-- M0: upstream imported, baseline green (1142 tests, typecheck clean).
-- M1: migrations 047 to 051 written and tested locally; dashboard code not started.
-- Open: the 13 house rules text (from the Villa Forms Pack) is not seeded yet.
+- M0: upstream imported, baseline green. Supabase project live, login works on Vercel.
+- M1 (done): migrations 047 to 051 applied; Stays dashboard at /stays (list, filters, search,
+  New registration, edit, detail drawer, pause automation, add/correct mobile, cancel);
+  API /api/stays and /api/stays/[id]; `isAutomationAllowed` in src/lib/stays/automation.ts
+  (not yet wired into a send function: that is M3).
+- Next: M2 public guest form /stay/<token>, ID camera/upload, signed-URL viewing, verify/reject.
+- Open: the 13 house rules text (Villa Forms Pack) is not seeded; the guest form needs it.
+- Stays UI strings are English in all four catalogues (es/pt/ko not translated yet).
