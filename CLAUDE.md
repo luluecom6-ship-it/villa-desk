@@ -24,7 +24,9 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   only through the server with a 60-second signed URL, owner/admin only, every open logged.
   Store only the last 4 characters of an ID number, never the full number.
 - **Roles:** use the existing `requireRole()` on the server and `is_account_member()` in
-  RLS. Caretaker (agent) must never see ID images or deposit amounts.
+  RLS. Owner decision (migration 054): caretakers (agent) MAY view ID images and attach an ID on
+  a guest's behalf (both logged); only admin/owner verify or reject IDs and read the access log.
+  Caretakers must never see deposit amounts. Viewers see no ID files.
 - **Logs** never contain ID numbers, file contents or full phone numbers.
 - **Time zone** is Asia/Kolkata; automated sends only 09:00 to 20:00, otherwise wait.
 - Migrations are numbered from 047, idempotent (IF NOT EXISTS / DROP POLICY IF EXISTS),
@@ -57,6 +59,8 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
 - Deliberate exceptions: a failed submit removes only its own never-recorded uploads. Saved guests
   and ID files are never removed by the form (replaced IDs are marked superseded).
 - Not built yet: staff attaching an ID on a guest's behalf; Form C data for occupants (lead only).
+- Caretaker ID access (054, needs applying): caretakers view IDs and upload on a guest's behalf
+  (`staff_attach_document`, logged as `staff_upload`; the new file resets verification).
 - Next: M3 channels (Meta + Evolution), scheduler, wire `isAutomationAllowed` into the send function.
 - Open: the 13 house rules text is not published. Guests see "not open yet" until an admin
   publishes it from the banner on /stays.

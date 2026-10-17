@@ -26,6 +26,8 @@ import { formatIst } from '@/lib/stays/time'
 import type { AutomationState, IdStatus, StayRow, StayGuestSummary } from '@/lib/stays/types'
 import { AutomationBadge, FormBadge, IdBadge, StatusBadge } from './stay-badges'
 import { StayFormDialog, type SavedStay } from './stay-form-dialog'
+import { StaffIdUpload } from './staff-id-upload'
+import { useCan } from '@/hooks/use-can'
 
 export type DrawerStay = Omit<StayRow, 'form_token'> & {
   automation: AutomationState
@@ -55,6 +57,8 @@ interface Props {
 
 export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
   const t = useTranslations('Stays')
+  // Caretakers (agent) and above may view and attach ID files; only admins review them.
+  const canIds = useCan('send-messages')
   const [detail, setDetail] = useState<Detail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -321,9 +325,10 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                                     : ''}
                             </span>
                           </div>
-                          {isAdmin && (() => {
+                          {canIds && (() => {
                             const docs = (detail?.documents ?? []).filter((d) => d.guest_id === g.id)
                             if (docs.length === 0 && !g.is_adult) return null
+                            const canUpload = stay.status !== 'cancelled'
                             return (
                               <div className="mt-2 space-y-2">
                                 <div className="flex flex-wrap gap-2">
@@ -346,7 +351,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                                     <span className="text-xs text-muted-foreground">{t('drawer.noIdFile')}</span>
                                   )}
                                 </div>
-                                {g.is_adult && docs.some((d) => d.side === 'front') && (
+                                {isAdmin && g.is_adult && docs.some((d) => d.side === 'front') && (
                                   rejectFor === g.id ? (
                                     <div className="space-y-2">
                                       <Input
@@ -401,6 +406,18 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                                     </div>
                                   )
                                 )}
+                                {canUpload && (
+                                  <StaffIdUpload
+                                    stayId={stay.id}
+                                    guestId={g.id}
+                                    hasFront={docs.some((d) => d.side === 'front')}
+                                    hasBack={docs.some((d) => d.side === 'back')}
+                                    onUploaded={() => {
+                                      void load()
+                                      onChanged()
+                                    }}
+                                  />
+                                )}
                               </div>
                             )
                           })()}
@@ -408,7 +425,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                       ))}
                     </ul>
                   )}
-                  {isAdmin && detail && detail.documents.length > 0 && (
+                  {canIds && detail && detail.documents.length > 0 && (
                     <p className="mt-2 text-xs text-muted-foreground">
                       {t('drawer.idFiles', { count: detail.documents.length })}
                     </p>

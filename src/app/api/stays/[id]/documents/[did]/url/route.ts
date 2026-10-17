@@ -12,16 +12,16 @@ export const SIGNED_URL_SECONDS = 60
 // The only way an ID image leaves the private bucket (PDR 13.3).
 //
 // POST so a link is never created by a prefetch or a page reload: one click,
-// one request, one logged open. Owner/admin only. The access-log row is
+// one request, one logged open. Caretaker and above. The access-log row is
 // written BEFORE the link is created, and if the log cannot be written no link
-// is issued (fail closed). Links last 60 seconds. Caretakers get 403.
+// is issued (fail closed). Links last 60 seconds. Viewers get 403.
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string; did: string }> },
 ) {
   let ctx
   try {
-    ctx = await requireRole('admin')
+    ctx = await requireRole('agent')
   } catch (err) {
     return toErrorResponse(err)
   }

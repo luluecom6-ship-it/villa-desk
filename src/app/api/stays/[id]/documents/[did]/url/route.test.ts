@@ -9,7 +9,7 @@ const DOC = '22222222-2222-4222-8222-222222222222'
 
 const h = vi.hoisted(() => ({
   calls: [] as string[],
-  role: 'admin' as 'admin' | 'agent',
+  role: 'admin' as 'admin' | 'agent' | 'viewer',
   logFails: false,
   signFails: false,
   docFound: true,
@@ -32,11 +32,11 @@ vi.mock('@/lib/auth/account', () => {
   return {
     requireRole: async () => {
       h.calls.push('requireRole')
-      if (h.role !== 'admin') throw new Forbidden('no')
+      if (h.role === 'viewer') throw new Forbidden('no')
       return {
         accountId: 'acc-1',
         userId: 'user-1',
-        role: 'admin',
+        role: h.role,
         supabase: {
           from: () => {
             const q: Record<string, unknown> = {}
@@ -105,8 +105,15 @@ describe('POST /api/stays/[id]/documents/[did]/url', () => {
     expect(h.calls).toEqual(['requireRole', 'lookup', 'insert:document_access_log', 'sign:60'])
   })
 
-  it('refuses a caretaker before touching anything', async () => {
+  it('lets a caretaker view an ID, and records their role in the log', async () => {
     h.role = 'agent'
+    const res = await call()
+    expect(res.status).toBe(200)
+    expect(h.calls).toEqual(['requireRole', 'lookup', 'insert:document_access_log', 'sign:60'])
+  })
+
+  it('refuses a viewer before touching anything', async () => {
+    h.role = 'viewer'
     const res = await call()
     expect(res.status).toBe(403)
     expect(h.calls).toEqual(['requireRole'])

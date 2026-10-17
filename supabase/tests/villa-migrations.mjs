@@ -51,7 +51,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -192,7 +192,8 @@ const as = async (uid, sql) => {
 const count = async (uid, t) => Number((await as(uid, `SELECT count(*)::int AS n FROM ${t}`)).rows[0].n);
 
 ok('admin sees documents', (await count(admin, 'stay_documents')) === 1);
-ok('caretaker (agent) cannot see documents', (await count(agent, 'stay_documents')) === 0);
+ok('caretaker (agent) can see documents (migration 054)', (await count(agent, 'stay_documents')) > 0);
+ok('viewer cannot see documents', (await count(viewer, 'stay_documents')) === 0);
 ok('viewer cannot see documents', (await count(viewer, 'stay_documents')) === 0);
 ok('caretaker sees stays', (await count(agent, 'stays')) > 0);
 ok('viewer sees stays', (await count(viewer, 'stays')) > 0);
@@ -347,6 +348,33 @@ let logWriteBlocked = false;
 try { await as(admin, `INSERT INTO document_access_log(account_id, stay_id, document_id) VALUES ('${acct}','${sA.id}','${docId}')`); } catch { logWriteBlocked = true; }
 ok('signed-in users cannot write the access log', logWriteBlocked);
 await rejects('a document with log entries cannot be deleted', `DELETE FROM stay_documents WHERE id='${docId}'`, /foreign key|violates/i);
+
+
+// ---- Migration 054: caretaker ID access + staff upload --------------------
+const gA = (await one(`SELECT id FROM stay_guests WHERE stay_id='${sA.id}' AND role='lead'`)).id;
+const sha54 = 'b'.repeat(64);
+const attach = (path, side = 'front', stay = sA.id, guest = gA, acc = acct) =>
+  one(`SELECT public.staff_attach_document('${acc}','${stay}','${guest}','${side}','${path}','image/jpeg',1234,'${sha54}','${agent}','agent') AS id`);
+await db.exec(`UPDATE stay_guests SET id_verified_at = now() WHERE id='${gA}'`);
+const oldDoc = (await one(`SELECT id FROM stay_documents WHERE guest_id='${gA}' AND side='front' AND superseded_at IS NULL`)).id;
+const newDoc = (await attach(`account-${acct}/${sA.id}/staff1.jpg`)).id;
+ok('staff upload supersedes the old live file, never deletes it',
+  (await one(`SELECT superseded_at IS NOT NULL AS s FROM stay_documents WHERE id='${oldDoc}'`)).s === true &&
+  (await one(`SELECT count(*)::int n FROM stay_documents WHERE guest_id='${gA}' AND side='front' AND superseded_at IS NULL`)).n === 1);
+ok('staff upload records who uploaded it', (await one(`SELECT uploaded_by FROM stay_documents WHERE id='${newDoc}'`)).uploaded_by === agent);
+ok('staff upload sends the guest back to review', (await one(`SELECT id_verified_at FROM stay_guests WHERE id='${gA}'`)).id_verified_at === null);
+ok('staff upload is written to the access log',
+  (await one(`SELECT count(*)::int n FROM document_access_log WHERE document_id='${newDoc}' AND action='staff_upload' AND opened_role='agent'`)).n === 1);
+await attach(`account-${acct}/${sA.id}/staff2.jpg`, 'back');
+ok('staff can add a back side', (await one(`SELECT count(*)::int n FROM stay_documents WHERE guest_id='${gA}' AND side='back' AND superseded_at IS NULL`)).n === 1);
+await rejects('staff upload: path outside the stay folder', `SELECT public.staff_attach_document('${acct}','${sA.id}','${gA}','front','account-x/other/a.jpg','image/jpeg',1,'${sha54}','${agent}','agent')`, /stay_doc:bad_path/);
+await rejects('staff upload: wrong account', `SELECT public.staff_attach_document('${acct2}','${sA.id}','${gA}','front','account-${acct2}/${sA.id}/a.jpg','image/jpeg',1,'${sha54}','${agent}','agent')`, /stay_doc:not_found/);
+await rejects('staff upload: guest from another stay', `SELECT public.staff_attach_document('${acct}','${sB.id}','${gA}','front','account-${acct}/${sB.id}/a.jpg','image/jpeg',1,'${sha54}','${agent}','agent')`, /stay_doc:bad_guest/);
+await rejects('staff upload: bad side', `SELECT public.staff_attach_document('${acct}','${sA.id}','${gA}','top','account-${acct}/${sA.id}/a.jpg','image/jpeg',1,'${sha54}','${agent}','agent')`, /stay_doc:bad_side/);
+let attachBlocked = false;
+try { await as(agent, `SELECT public.staff_attach_document('${acct}','${sA.id}','${gA}','front','account-${acct}/${sA.id}/z.jpg','image/jpeg',1,'${sha54}','${agent}','agent')`); } catch { attachBlocked = true; }
+ok('signed-in users cannot call staff_attach_document directly', attachBlocked);
+ok('caretaker still cannot read the access log', (await count(agent, 'document_access_log')) === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

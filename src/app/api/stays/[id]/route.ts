@@ -21,7 +21,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Stay detail + edit (PDR 5.3 / 12.1).
 //
-// GET    any member. ID file metadata is returned only to admin and above;
+// GET    any member. ID file metadata is returned to caretakers (agent) and above;
 //        the images themselves are never served from here (they go through
 //        the signed-URL route, which logs every open).
 // PATCH  admin and above. Edits details, adds / corrects / removes the
@@ -38,6 +38,7 @@ export async function GET(
     if (!UUID.test(id)) return NextResponse.json({ error: t('errors.notFound') }, { status: 404 })
     const ctx = await getCurrentAccount()
     const isAdmin = hasMinRole(ctx.role, 'admin')
+    const canSeeIds = hasMinRole(ctx.role, 'agent')
 
     const { data, error } = await ctx.supabase
       .from('stays')
@@ -54,9 +55,9 @@ export async function GET(
         .select('typed_name, accepted_at, ip_address, rules_version_id, house_rules_versions(version)')
         .eq('stay_id', id)
         .maybeSingle(),
-      // RLS returns nothing to roles below admin; the explicit check keeps
-      // that guarantee visible here too.
-      isAdmin
+      // Caretakers (agent) and above may see ID files; viewers may not. RLS
+      // enforces the same; the explicit check keeps it visible here.
+      canSeeIds
         ? ctx.supabase
             .from('stay_documents')
             .select('id, guest_id, side, content_type, size_bytes, uploaded_at')

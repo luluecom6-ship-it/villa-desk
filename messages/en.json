@@ -2879,7 +2879,16 @@
       "houseRulesNewVersionNote": "Publishing creates a new version. Guests who already signed keep their signed version.",
       "houseRulesPublishButton": "Publish",
       "houseRulesCancel": "Close",
-      "houseRulesPublished": "House rules published (v{version})"
+      "houseRulesPublished": "House rules published (v{version})",
+      "addIdTitle": "Add ID photo for this guest",
+      "takePhoto": "Take photo",
+      "uploadFile": "Upload file",
+      "replaceNote": "A new file replaces this one. The old file is kept on record.",
+      "prepare": {
+        "pdfTooLarge": "This PDF is too large (3 MB max).",
+        "unreadable": "Could not read this file.",
+        "unsupported": "This file type is not supported."
+      }
     },
     "cancel": {
       "title": "Cancel this stay?",
@@ -2898,7 +2907,9 @@
       "cancelled": "Stay cancelled",
       "documentFailed": "Could not open the ID file",
       "idVerified": "ID verified",
-      "idRejected": "ID rejected, guest can resubmit"
+      "idRejected": "ID rejected, guest can resubmit",
+      "uploadFailed": "Could not upload the ID file",
+      "idUploaded": "ID file saved. It needs review again."
     },
     "errors": {
       "invalidJson": "Invalid request body",
@@ -2925,7 +2936,12 @@
       "tooLong": "Too long",
       "documentUnavailable": "The ID file could not be opened right now. Nothing was shown.",
       "rejectReason": "Enter a short reason (3 to 300 characters)",
-      "noIdToVerify": "There is no ID photo to verify yet"
+      "noIdToVerify": "There is no ID photo to verify yet",
+      "fileTooLarge": "This file is too large",
+      "file_empty": "This file is empty",
+      "file_tooLarge": "This file is too large",
+      "file_unsupportedType": "Use a JPEG, PNG or WebP photo, or a PDF",
+      "documentSaveFailed": "Could not save the ID file"
     }
   },
   "GuestForm": {
