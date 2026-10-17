@@ -58,10 +58,25 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   in-memory per server process (weak on serverless).
 - Deliberate exceptions: a failed submit removes only its own never-recorded uploads. Saved guests
   and ID files are never removed by the form (replaced IDs are marked superseded).
-- Not built yet: staff attaching an ID on a guest's behalf; Form C data for occupants (lead only).
+- Not built yet: Form C data for occupants (lead only). Form 1 extras (alternate mobile, occupation,
+  emergency contact, occupant mobiles) are not collected: not in the PDR field list; ask the owner.
 - Caretaker ID access (054, needs applying): caretakers view IDs and upload on a guest's behalf
   (`staff_attach_document`, logged as `staff_upload`; the new file resets verification).
-- Next: M3 channels (Meta + Evolution), scheduler, wire `isAutomationAllowed` into the send function.
-- Open: the 13 house rules text is not published. Guests see "not open yet" until an admin
-  publishes it from the banner on /stays.
+- M3 part 1 (done, needs migration 055): scheduler `/api/stays/cron` (setup: docs/villa-scheduler.md),
+  `stay_messages` (unique per stay + key, claimed before sending), append-only `stay_message_log`
+  (last 4 digits of a phone only), editable `stay_message_templates`, the eleven message keys with the
+  PDR 7.1 schedule in IST and the 09:00 to 20:00 window (src/lib/stays/messaging/). The single guest
+  send function is `sendStayWhatsApp()`: it re-checks the allow-list at send time and logs
+  `blocked_not_registered`. Inbound READY/1/2 + "other" alert in `handleStayInbound()`, hooked into the
+  WhatsApp webhook; villa mode (`properties.villa_mode`) keeps flows, automations and the AI bot away
+  from unregistered numbers (inbound in the webhook, outbound via `assertVillaSendAllowed`).
+  Staff alerts use `notifications` type `stay_alert`. Stay drawer shows each stay's message queue.
+- M3 still to do: port Evolution (needs the Jwacrm repo attached): client, webhook, QR + pairing-code
+  mobile link screen, safety.ts with the IST window setting, channel routing via `conversations.channel`
+  (column added in 055). A property settings screen (address, map, access text, templates editor).
+  Until then all stay messages go out on Meta and `properties.default_channel` is ignored.
+- Next after M3: M4 deposits, audit log, hardening; M5 checklists and damage report.
+- Open: house rules are not published yet. The editor on /stays is pre-filled with the 13 rules from
+  Form 2 of the Forms Pack (src/lib/stays/default-house-rules.ts); an admin reviews and presses Publish.
+  Until then guests see "not open yet".
 - Stays UI strings are English in all four catalogues (es/pt/ko not translated yet).

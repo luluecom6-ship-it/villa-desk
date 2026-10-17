@@ -2888,7 +2888,9 @@
         "pdfTooLarge": "This PDF is too large (3 MB max).",
         "unreadable": "Could not read this file.",
         "unsupported": "This file type is not supported."
-      }
+      },
+      "messages": "WhatsApp messages",
+      "messagesNone": "No messages scheduled yet. They are queued once the stay has a mobile number."
     },
     "cancel": {
       "title": "Cancel this stay?",
@@ -2942,6 +2944,28 @@
       "file_tooLarge": "This file is too large",
       "file_unsupportedType": "Use a JPEG, PNG or WebP photo, or a PDF",
       "documentSaveFailed": "Could not save the ID file"
+    },
+    "messageKeys": {
+      "form_link": "Form link",
+      "form_reminder_3d": "Form reminder (3 days)",
+      "form_reminder_2d": "Form reminder (2 days)",
+      "form_reminder_1d": "Form reminder (1 day)",
+      "id_alert_staff": "Staff alert: IDs to verify",
+      "arrival_info": "Arrival info",
+      "access_details": "Access details",
+      "owner_alert": "Staff alert: form incomplete",
+      "arrival_check": "Arrival check-in",
+      "checkout_reminder": "Checkout reminder",
+      "review_request": "Review request"
+    },
+    "messageStatus": {
+      "queued": "Queued",
+      "sending": "Sending",
+      "sent": "Sent",
+      "failed": "Failed",
+      "blocked_not_registered": "Blocked (not registered)",
+      "skipped_condition": "Not needed",
+      "cancelled": "Cancelled"
     }
   },
   "GuestForm": {

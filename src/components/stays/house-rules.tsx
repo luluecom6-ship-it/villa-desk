@@ -7,6 +7,7 @@ import { AlertTriangle, Loader2, ScrollText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { DEFAULT_RULES_BODY, DEFAULT_RULES_TITLE } from '@/lib/stays/default-house-rules'
 import {
   Dialog,
   DialogContent,
@@ -54,8 +55,9 @@ export function HouseRulesPanel({ isAdmin }: { isAdmin: boolean }) {
 
   function openEditor() {
     // Start from the current wording so a small change is a small edit.
-    setTitle(rules?.title ?? '')
-    setBody(rules?.body ?? '')
+    // First time: offer the Forms Pack wording to review (never auto-published).
+    setTitle(rules?.title ?? DEFAULT_RULES_TITLE)
+    setBody(rules?.body ?? DEFAULT_RULES_BODY)
     setFieldError(null)
     setOpen(true)
   }

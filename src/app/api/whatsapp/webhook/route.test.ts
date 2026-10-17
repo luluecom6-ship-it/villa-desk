@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   dispatchInboundToFlows: vi.fn(),
   dispatchInboundToAiReply: vi.fn(),
   dispatchWebhookEvent: vi.fn(),
+  handleStayInbound: vi.fn(),
   state: {
     // Result the message upsert's .select() resolves to. A genuine insert
     // returns the row; a replayed delivery conflicts and returns [].
@@ -277,6 +278,9 @@ vi.mock('@/lib/flows/engine', () => ({
 vi.mock('@/lib/ai/auto-reply', () => ({
   dispatchInboundToAiReply: h.dispatchInboundToAiReply,
 }))
+vi.mock('@/lib/stays/messaging/inbound', () => ({
+  handleStayInbound: h.handleStayInbound,
+}))
 vi.mock('@/lib/webhooks/deliver', () => ({
   dispatchWebhookEvent: h.dispatchWebhookEvent,
 }))
@@ -363,6 +367,8 @@ async function runStatusWebhook(status: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Default: not a villa account, so the stay logic stays out of the way.
+  h.handleStayInbound.mockResolvedValue({ registered: false, handled: false, suppressAutomation: false })
   h.state.messageUpsertResult = [{ id: 'msg-1' }]
   h.state.priorCustomerMsgCount = 0
   h.state.replyContextParent = null
@@ -1052,5 +1058,47 @@ describe('inbound webhook: automation waiting for a reply', () => {
     await runWebhook()
 
     expect(h.resumeAwaitingReply).not.toHaveBeenCalled()
+  })
+})
+
+describe('inbound webhook: villa stay logic', () => {
+  it('passes the sender number and text to the stay handler', async () => {
+    await runWebhook()
+    expect(h.handleStayInbound).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ accountId: 'acc-1', phone: '15551230000', text: 'hello' }),
+    )
+  })
+
+  it('an unregistered number in villa mode reaches no flow, automation or AI bot', async () => {
+    h.handleStayInbound.mockResolvedValue({ registered: false, handled: false, suppressAutomation: true })
+    await runWebhook()
+    expect(h.dispatchInboundToFlows).not.toHaveBeenCalled()
+    expect(h.resumeAwaitingReply).not.toHaveBeenCalled()
+    expect(h.runAutomationsForTrigger).not.toHaveBeenCalled()
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled()
+    // The message itself is still stored and still announced to webhooks.
+    expect(h.dispatchWebhookEvent).toHaveBeenCalledWith(expect.anything(), 'acc-1', 'message.received', expect.anything())
+  })
+
+  it('READY / 1 / 2 from a registered guest is answered by the stay logic alone', async () => {
+    h.handleStayInbound.mockResolvedValue({ registered: true, handled: true, suppressAutomation: false })
+    await runWebhook()
+    expect(h.runAutomationsForTrigger).not.toHaveBeenCalled()
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled()
+  })
+
+  it('other text from a registered guest continues through the normal pipeline', async () => {
+    h.handleStayInbound.mockResolvedValue({ registered: true, handled: false, suppressAutomation: false })
+    await runWebhook()
+    expect(h.runAutomationsForTrigger).toHaveBeenCalled()
+  })
+
+  it('if the stay check itself fails, upstream bots stay quiet (fail closed)', async () => {
+    h.handleStayInbound.mockRejectedValue(new Error('db down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await runWebhook()
+    expect(h.runAutomationsForTrigger).not.toHaveBeenCalled()
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled()
   })
 })

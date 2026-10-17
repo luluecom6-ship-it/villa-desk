@@ -1,3 +1,4 @@
+import { assertVillaSendAllowed } from '@/lib/stays/messaging/villa-mode'
 import {
   sendInteractiveButtons,
   sendInteractiveList,
@@ -107,6 +108,7 @@ export async function engineSendText(
   // Same for the conversation the message lands in — see
   // conversation-scope.ts (GHSA-m4fx-g6pr-hrw8).
   await assertConversationInAccount(db, args.conversationId, args.accountId)
+  await assertVillaSendAllowed(db, args.accountId, contact.phone, 'flow')
 
   // Phone number, or the business-scoped user ID when Meta has never
   // given us a number for this customer (issue #519).
@@ -221,6 +223,7 @@ export async function engineSendMedia(
   // Same for the conversation the message lands in — see
   // conversation-scope.ts (GHSA-m4fx-g6pr-hrw8).
   await assertConversationInAccount(db, args.conversationId, args.accountId)
+  await assertVillaSendAllowed(db, args.accountId, contact.phone, 'flow')
 
   // Phone number, or the business-scoped user ID when Meta has never
   // given us a number for this customer (issue #519).
@@ -377,6 +380,7 @@ async function sendInteractiveViaMeta(
   // Same for the conversation the message lands in — see
   // conversation-scope.ts (GHSA-m4fx-g6pr-hrw8).
   await assertConversationInAccount(db, input.conversationId, input.accountId)
+  await assertVillaSendAllowed(db, input.accountId, contact.phone, 'flow')
 
   // Phone number, or the business-scoped user ID when Meta has never
   // given us a number for this customer (issue #519).

@@ -49,7 +49,7 @@ export async function GET(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) return NextResponse.json({ error: t('errors.notFound') }, { status: 404 })
 
-    const [acceptance, documents] = await Promise.all([
+    const [acceptance, documents, messages] = await Promise.all([
       ctx.supabase
         .from('stay_acceptances')
         .select('typed_name, accepted_at, ip_address, rules_version_id, house_rules_versions(version)')
@@ -64,6 +64,12 @@ export async function GET(
             .eq('stay_id', id)
             .is('superseded_at', null)
         : Promise.resolve({ data: [] as unknown[] }),
+      // The scheduled WhatsApp messages for this stay (status only, no text).
+      ctx.supabase
+        .from('stay_messages')
+        .select('message_key, due_at, status, sent_at, attempts, last_error')
+        .eq('stay_id', id)
+        .order('due_at', { ascending: true }),
     ])
 
     return NextResponse.json({
@@ -73,6 +79,7 @@ export async function GET(
       }),
       acceptance: acceptance.data ?? null,
       documents: documents.data ?? [],
+      messages: messages.data ?? [],
     })
   } catch (err) {
     return toErrorResponse(err)

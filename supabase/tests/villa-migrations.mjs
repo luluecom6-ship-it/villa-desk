@@ -40,6 +40,10 @@ await db.exec(`
   CREATE TABLE profiles (user_id uuid PRIMARY KEY REFERENCES auth.users(id),
     account_id uuid REFERENCES accounts(id), account_role account_role_enum);
   CREATE TABLE contacts (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), account_id uuid, phone text);
+  CREATE TABLE conversations (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), account_id uuid);
+  CREATE TABLE notifications (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), account_id uuid, user_id uuid,
+    type text NOT NULL DEFAULT 'conversation_assigned', title text NOT NULL, body text,
+    CONSTRAINT notifications_type_check CHECK (type IN ('conversation_assigned')));
   CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS trigger LANGUAGE plpgsql
     AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$;
 `);
@@ -51,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -375,6 +379,42 @@ let attachBlocked = false;
 try { await as(agent, `SELECT public.staff_attach_document('${acct}','${sA.id}','${gA}','front','account-${acct}/${sA.id}/z.jpg','image/jpeg',1,'${sha54}','${agent}','agent')`); } catch { attachBlocked = true; }
 ok('signed-in users cannot call staff_attach_document directly', attachBlocked);
 ok('caretaker still cannot read the access log', (await count(agent, 'document_access_log')) === 0);
+
+
+// ---- Migration 055: stay messages ------------------------------------------
+const sM = await future(acct, prop, '919777777777');
+const addMsg = (key, status = 'queued') =>
+  db.exec(`INSERT INTO stay_messages(account_id, stay_id, message_key, due_at, status) VALUES ('${acct}','${sM.id}','${key}', now(), '${status}')`);
+await addMsg('form_link');
+await rejects('one row per stay and message key (no double send)', `INSERT INTO stay_messages(account_id, stay_id, message_key, due_at) VALUES ('${acct}','${sM.id}','form_link', now())`, /duplicate key|unique/i);
+await rejects('unknown message key refused', `INSERT INTO stay_messages(account_id, stay_id, message_key, due_at) VALUES ('${acct}','${sM.id}','spam', now())`, /check/i);
+await rejects('stay_message must belong to the same account', `INSERT INTO stay_messages(account_id, stay_id, message_key, due_at) VALUES ('${acct2}','${sM.id}','arrival_info', now())`, /./);
+await addMsg('arrival_info'); await addMsg('review_request', 'sent');
+await db.exec(`UPDATE stays SET status = 'cancelled' WHERE id='${sM.id}'`);
+ok('cancelling a stay cancels queued messages', (await one(`SELECT count(*)::int n FROM stay_messages WHERE stay_id='${sM.id}' AND status='cancelled'`)).n === 2);
+ok('cancelling keeps sent history', (await one(`SELECT status FROM stay_messages WHERE stay_id='${sM.id}' AND message_key='review_request'`)).status === 'sent');
+ok('cancelled messages are never deleted', (await one(`SELECT count(*)::int n FROM stay_messages WHERE stay_id='${sM.id}'`)).n === 3);
+await db.exec(`INSERT INTO stay_message_log(account_id, stay_id, message_key, outcome, reason, phone_tail) VALUES ('${acct}','${sM.id}','form_link','blocked_not_registered','not_on_allow_list','7777')`);
+await rejects('message log refuses a full phone number', `INSERT INTO stay_message_log(account_id, outcome, phone_tail) VALUES ('${acct}','sent','919777777777')`, /check/i);
+await rejects('message log rows cannot be edited', `UPDATE stay_message_log SET outcome='sent'`, /immutable/);
+await rejects('message log rows cannot be deleted', `DELETE FROM stay_message_log`, /cannot be deleted/);
+ok('admin reads the message log', (await count(admin, 'stay_message_log')) === 1);
+ok('caretaker cannot read the message log', (await count(agent, 'stay_message_log')) === 0);
+ok('caretaker can read stay messages', (await count(agent, 'stay_messages')) === 3);
+ok('viewer cannot read stay messages', (await count(viewer, 'stay_messages')) === 0);
+let msgWriteBlocked = false;
+try { await as(admin, `INSERT INTO stay_messages(account_id, stay_id, message_key, due_at) VALUES ('${acct}','${sM.id}','owner_alert', now())`); } catch { msgWriteBlocked = true; }
+ok('signed-in users cannot write stay_messages', msgWriteBlocked);
+await as(admin, `INSERT INTO stay_message_templates(account_id, message_key, body) VALUES ('${acct}','form_link','Hi {guest_first_name}')`);
+ok('admin can save a template', (await count(admin, 'stay_message_templates')) === 1);
+let tplBlocked = false;
+try { await as(agent, `INSERT INTO stay_message_templates(account_id, message_key, body) VALUES ('${acct}','arrival_info','x')`); } catch { tplBlocked = true; }
+ok('caretaker cannot edit templates', tplBlocked);
+await db.exec(`INSERT INTO notifications(account_id, user_id, type, title) VALUES ('${acct}','${owner}','stay_alert','x')`);
+ok('notifications accept the stay_alert type', true);
+await db.exec(`INSERT INTO conversations(account_id) VALUES ('${acct}')`);
+await db.exec(`UPDATE conversations SET channel='meta'`);
+await rejects('conversation channel is meta, evolution or empty', `UPDATE conversations SET channel='sms'`, /check/i);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

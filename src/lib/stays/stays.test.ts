@@ -310,3 +310,15 @@ describe('filters', () => {
     expect(filterStays(list, 'all', '90000', NOW).map((s) => s.id)).toEqual(['2'])
   })
 })
+
+import { DEFAULT_RULES_BODY } from './default-house-rules'
+
+describe('default house rules', () => {
+  it('has all 13 numbered rules in order', () => {
+    const nums = [...DEFAULT_RULES_BODY.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]))
+    expect(nums).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+  })
+  it('fits the publish limit', () => {
+    expect(DEFAULT_RULES_BODY.length).toBeLessThan(20_000)
+  })
+})

@@ -16,6 +16,7 @@ import { reopenClosedConversation } from '@/lib/conversations/reopen'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { resumeAwaitingReply, runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
+import { handleStayInbound } from '@/lib/stays/messaging/inbound'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import {
@@ -856,6 +857,39 @@ async function processMessage(
   // so the broadcast's `replied_count` advances (via the aggregate
   // trigger installed in migration 003).
   await flagBroadcastReplyIfAny(accountId, contactRecord.id)
+
+  // ============================================================
+  // Villa stay logic (PDR 4.2 / 7.2).
+  //
+  // Only numbers on the stay allow-list get READY / 1 / 2 handling. While
+  // villa mode is on, a number that is NOT registered gets nothing from
+  // flows, automations or the AI bot, and a registered guest's READY / 1 / 2
+  // is answered by the stay logic alone. Staff still see every message in
+  // the inbox. Fails closed: if this check errors, upstream bots stay quiet.
+  // ============================================================
+  let skipUpstreamBots = false
+  try {
+    const stayInbound = await handleStayInbound(supabaseAdmin(), {
+      accountId,
+      phone: identity.phone || null,
+      text: contentText ?? message.text?.body ?? '',
+      requestUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'http://localhost',
+    })
+    skipUpstreamBots = stayInbound.suppressAutomation || stayInbound.handled
+  } catch (err) {
+    console.error('[webhook] stay inbound handling failed:', (err as { code?: string })?.code ?? 'error')
+    skipUpstreamBots = true
+  }
+  if (skipUpstreamBots) {
+    await dispatchWebhookEvent(supabaseAdmin(), accountId, 'message.received', {
+      conversation_id: conversation.id,
+      contact_id: contactRecord.id,
+      whatsapp_message_id: message.id,
+      content_type: contentType,
+      text: contentText,
+    })
+    return
+  }
 
   // ============================================================
   // Flow runner dispatch.

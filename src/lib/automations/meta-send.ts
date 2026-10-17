@@ -1,3 +1,4 @@
+import { assertVillaSendAllowed } from '@/lib/stays/messaging/villa-mode'
 import { sendTextMessage, sendTemplateMessage } from '@/lib/whatsapp/meta-api'
 import type { InteractiveMessagePayload } from '@/lib/whatsapp/interactive'
 import {
@@ -136,6 +137,7 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
   // Same for the conversation the message lands in — see
   // conversation-scope.ts (GHSA-m4fx-g6pr-hrw8).
   await assertConversationInAccount(db, input.conversationId, input.accountId)
+  await assertVillaSendAllowed(db, input.accountId, contact.phone, 'automation')
 
   // Phone number, or the business-scoped user ID when Meta has never
   // given us a number for this customer (issue #519).

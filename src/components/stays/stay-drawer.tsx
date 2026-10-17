@@ -45,6 +45,7 @@ interface Detail {
     house_rules_versions: { version: number } | { version: number }[] | null
   } | null
   documents: Array<{ id: string; guest_id: string; side: string; content_type: string; size_bytes: number }>
+  messages?: Array<{ message_key: string; due_at: string; status: string; sent_at: string | null; attempts: number; last_error: string | null }>
 }
 
 interface Props {
@@ -429,6 +430,28 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                     <p className="mt-2 text-xs text-muted-foreground">
                       {t('drawer.idFiles', { count: detail.documents.length })}
                     </p>
+                  )}
+                </Section>
+
+                {/* Scheduled WhatsApp messages */}
+                <Section title={t('drawer.messages')}>
+                  {(detail?.messages ?? []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t('drawer.messagesNone')}</p>
+                  ) : (
+                    <ul className="space-y-1.5 text-sm">
+                      {(detail?.messages ?? []).map((m) => (
+                        <li key={m.message_key} className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate">{t(`messageKeys.${m.message_key}`)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {m.sent_at ? formatIst(m.sent_at) : formatIst(m.due_at)}
+                              {m.last_error && m.status !== 'sent' ? ` · ${m.last_error.replace(/_/g, ' ')}` : ''}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-xs text-muted-foreground">{t(`messageStatus.${m.status}`)}</span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </Section>
 

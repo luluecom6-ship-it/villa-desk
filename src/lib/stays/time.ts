@@ -55,3 +55,17 @@ export function formatIst(date: Date | string | null | undefined): string {
     hour12: true,
   }).format(d)
 }
+
+/** Hour of day (0 to 23) in IST. */
+export function istHour(date: Date): number {
+  return new Date(date.getTime() + IST_OFFSET_MS).getUTCHours()
+}
+
+/**
+ * The instant that is `hour:minute` IST on the IST calendar day `dayOffset`
+ * days after the day holding `anchor`.
+ */
+export function istDayAt(anchor: Date, dayOffset: number, hour: number, minute = 0): Date {
+  const { start } = istDayBounds(anchor)
+  return new Date(start.getTime() + dayOffset * DAY_MS + (hour * 60 + minute) * 60 * 1000)
+}

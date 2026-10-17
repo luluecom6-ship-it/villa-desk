@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STAY_SOURCES, STAY_STATUSES } from '@/lib/stays/types'
 import { STAY_FILTERS } from '@/lib/stays/filters'
+import { MESSAGE_KEYS } from '@/lib/stays/messaging/schedule'
 
 // Every message key the Stays screens and API use must exist in the "Stays"
 // namespace. A missing key renders as a raw key path in the UI, which is easy
@@ -55,6 +56,8 @@ describe('Stays message keys', () => {
       ['idStatus', ['none', 'pending', 'verified', 'rejected']],
       ['formStatus', ['pending', 'submitted']],
       ['automation.reason', ['cancelled', 'sample', 'no_mobile', 'paused', 'closed']],
+      ['messageKeys', MESSAGE_KEYS],
+      ['messageStatus', ['queued', 'sending', 'sent', 'failed', 'blocked_not_registered', 'skipped_condition', 'cancelled']],
     ]
     const missing = families.flatMap(([prefix, values]) =>
       values.filter((v) => !has(`${prefix}.${v}`)).map((v) => `${prefix}.${v}`),
