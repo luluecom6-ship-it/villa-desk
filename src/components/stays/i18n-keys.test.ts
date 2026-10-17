@@ -70,3 +70,51 @@ describe('Stays message keys', () => {
     expect(keys.filter((k) => !has(`errors.${k}`))).toEqual([])
   })
 })
+
+// ---- GuestForm (public registration page + its API) -----------------------
+
+function hasGf(path: string): boolean {
+  let node: unknown = en.GuestForm
+  for (const part of path.split('.')) {
+    if (!node || typeof node !== 'object' || !(part in (node as object))) return false
+    node = (node as Record<string, unknown>)[part]
+  }
+  return typeof node === 'string'
+}
+
+describe('GuestForm message keys', () => {
+  const GF_SOURCES = [
+    ...files(join(ROOT, 'src/components/guest-form'), /\.tsx?$/),
+    ...files(join(ROOT, 'src/app/api/public/stay'), /\.ts$/),
+    join(ROOT, 'src/lib/stays/public-form.ts'),
+  ]
+
+  it('every literal t("key") exists', () => {
+    const missing: string[] = []
+    for (const file of GF_SOURCES) {
+      const text = readFileSync(file, 'utf8')
+      for (const m of text.matchAll(/\bt\(\s*'([A-Za-z0-9_.]+)'/g)) {
+        if (!hasGf(m[1])) missing.push(`${file.replace(ROOT, '')}: ${m[1]}`)
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
+  it('validation, submit and file error families are covered', () => {
+    const src = readFileSync(join(ROOT, 'src/lib/stays/guest-form.ts'), 'utf8')
+    const type = src.match(/export type GuestFormErrorKey =([^]*?)\n\n/)?.[1] ?? ''
+    const keys = [...type.matchAll(/'([A-Za-z0-9]+)'/g)].map((m) => m[1])
+    expect(keys.length).toBeGreaterThan(10)
+    const pub = readFileSync(join(ROOT, 'src/lib/stays/public-form.ts'), 'utf8')
+    const mapped = [...pub.matchAll(/key: '([A-Za-z]+)'/g)].map((m) => m[1])
+    const missing = [
+      ...keys.map((k) => `errors.${k}`),
+      ...mapped.map((k) => `errors.${k}`),
+      ...['empty', 'tooLarge', 'unsupportedType'].map((k) => `errors.file_${k}`),
+      ...['pdfTooLarge', 'unreadable', 'unsupported'].map((k) => `capture.${k}`),
+      ...['aadhaar', 'passport', 'driving_licence', 'voter_id', 'other'].map((k) => `idTypes.${k}`),
+      ...['leisure', 'business', 'family', 'event', 'other'].map((k) => `purposes.${k}`),
+    ].filter((p) => !hasGf(p))
+    expect(missing).toEqual([])
+  })
+})

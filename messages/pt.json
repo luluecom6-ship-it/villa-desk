@@ -2855,7 +2855,31 @@
       "ip": "IP address",
       "notAccepted": "Not accepted yet.",
       "cancelStay": "Cancel this stay",
-      "cancelHelp": "Cancelling stops all messages. The record and any files are kept."
+      "cancelHelp": "Cancelling stops all messages. The record and any files are kept.",
+      "idFront": "ID front",
+      "idBack": "ID back",
+      "viewFront": "View front",
+      "viewBack": "View back",
+      "noIdFile": "No ID file uploaded yet",
+      "verify": "Verify ID",
+      "reject": "Reject",
+      "confirmReject": "Reject ID",
+      "cancelReject": "Cancel",
+      "rejectReasonPlaceholder": "Reason shown to the guest (e.g. photo is blurry)",
+      "viewerNote": "This link expires in 60 seconds and the view is logged.",
+      "openPdf": "Open PDF",
+      "houseRulesNone": "No house rules published",
+      "houseRulesWarningTitle": "House rules not published yet",
+      "houseRulesWarning": "Guests cannot open their registration form until house rules are published.",
+      "houseRulesManage": "House rules",
+      "houseRulesPublish": "Publish house rules",
+      "houseRulesCurrent": "Current version: v{version}",
+      "houseRulesTitleLabel": "Title",
+      "houseRulesBodyLabel": "Rules (guests read and accept this text)",
+      "houseRulesNewVersionNote": "Publishing creates a new version. Guests who already signed keep their signed version.",
+      "houseRulesPublishButton": "Publish",
+      "houseRulesCancel": "Close",
+      "houseRulesPublished": "House rules published (v{version})"
     },
     "cancel": {
       "title": "Cancel this stay?",
@@ -2871,7 +2895,10 @@
       "paused": "Automation paused",
       "resumed": "Automation resumed",
       "mobileSaved": "Mobile number saved. Automation is on.",
-      "cancelled": "Stay cancelled"
+      "cancelled": "Stay cancelled",
+      "documentFailed": "Could not open the ID file",
+      "idVerified": "ID verified",
+      "idRejected": "ID rejected, guest can resubmit"
     },
     "errors": {
       "invalidJson": "Invalid request body",
@@ -2893,7 +2920,153 @@
       "phoneInUse": "Another active stay already uses this mobile number",
       "duplicateBookingRef": "Another stay from this source has the same booking reference. Saved anyway.",
       "notFound": "Stay not found",
-      "stayLocked": "This stay is closed and can no longer be edited"
+      "stayLocked": "This stay is closed and can no longer be edited",
+      "rulesBodyShort": "Enter the house rules text (at least 20 characters)",
+      "tooLong": "Too long",
+      "documentUnavailable": "The ID file could not be opened right now. Nothing was shown.",
+      "rejectReason": "Enter a short reason (3 to 300 characters)",
+      "noIdToVerify": "There is no ID photo to verify yet"
+    }
+  },
+  "GuestForm": {
+    "title": "Guest registration",
+    "privacy": "We collect your ID because Indian law requires every guest at a stay to be registered. Your ID photo is stored privately, is seen only by the villa owner, and is used only for this stay's records. We keep just the last 4 characters of the number.",
+    "alreadySubmitted": "Your details are saved. You can update them below until check-in.",
+    "submit": "Submit registration",
+    "update": "Save changes",
+    "submitting": "Saving…",
+    "stay": {
+      "dates": "Your stay"
+    },
+    "lead": {
+      "title": "Lead guest (the person booking)",
+      "fullName": "Full name (as on your ID)",
+      "mobile": "Mobile (WhatsApp)",
+      "mobileLocked": "This is the number your booking was made with.",
+      "email": "Email (optional)",
+      "nationalityType": "Nationality",
+      "indian": "Indian",
+      "foreign": "Foreign national",
+      "nationality": "Country of nationality",
+      "formCNote": "Foreign guests must be reported to the authorities (Form C). A passport is required.",
+      "visaType": "Visa type (optional)",
+      "visaExpiry": "Visa expiry (optional)",
+      "arrivedInIndia": "Date you arrived in India (optional)",
+      "address": "Home address"
+    },
+    "arrival": {
+      "title": "Your arrival",
+      "purpose": "Purpose of visit",
+      "purposeChoose": "Choose…",
+      "time": "Expected arrival time",
+      "vehicle": "Vehicle number (optional)",
+      "request": "Special request (optional)",
+      "requestHint": "Early check-in or late check-out are requests, not promises. We will confirm on WhatsApp."
+    },
+    "purposes": {
+      "leisure": "Leisure",
+      "business": "Business",
+      "family": "Family visit",
+      "event": "Event or celebration",
+      "other": "Other"
+    },
+    "id": {
+      "titleLead": "Your ID",
+      "type": "ID type",
+      "choose": "Choose…",
+      "last4": "Last 4 characters of ID number",
+      "last4Hint": "Only the last 4 are stored.",
+      "front": "ID photo, front",
+      "back": "ID photo, back (if it has one)"
+    },
+    "idTypes": {
+      "aadhaar": "Aadhaar",
+      "passport": "Passport",
+      "driving_licence": "Driving licence",
+      "voter_id": "Voter ID",
+      "other": "Other government ID"
+    },
+    "occupants": {
+      "title": "Other guests",
+      "hint": "Your booking is for {count, plural, one {# guest} other {# guests}}. Add everyone staying, including children.",
+      "guestN": "Guest {n}",
+      "name": "Full name",
+      "age": "Age",
+      "add": "Add a guest",
+      "remove": "Remove",
+      "childNote": "No ID is needed for guests under 18."
+    },
+    "rules": {
+      "title": "House rules",
+      "accept": "I have read and accept the house rules (version {version}) on behalf of all guests.",
+      "signature": "Type your full name to sign",
+      "signatureHint": "This counts as your signature.",
+      "alreadyAccepted": "You have already accepted the house rules."
+    },
+    "capture": {
+      "takePhoto": "Take photo",
+      "retake": "Retake",
+      "uploadFile": "Upload file",
+      "remove": "Remove",
+      "ready": "Ready",
+      "onFile": "Already uploaded",
+      "photo": "Photo",
+      "previewAlt": "Preview of {label}",
+      "pdfTooLarge": "This PDF is too large. Please use a file under 3 MB or take a photo.",
+      "unreadable": "We could not read this file. Please try another photo.",
+      "unsupported": "This file type is not supported. Use a photo or a PDF."
+    },
+    "done": {
+      "title": "Thank you, {name}!",
+      "body": "Your registration is saved.",
+      "reference": "Your reference",
+      "readyTitle": "Next step",
+      "readyBody": "When you set off for the villa, reply READY on WhatsApp so we can share arrival details.",
+      "edit": "Edit my details",
+      "editHint": "You can change your details until check-in."
+    },
+    "closed": {
+      "title": "This form is closed",
+      "body": "Your stay has started or finished, so the form can no longer be changed. Please contact the host if something needs fixing."
+    },
+    "invalid": {
+      "title": "Link not valid",
+      "body": "This registration link is not valid or has expired. Please ask your host for a new one."
+    },
+    "error": {
+      "title": "Something went wrong",
+      "retry": "Try again"
+    },
+    "errors": {
+      "notValid": "This link is not valid.",
+      "requestTooLarge": "The photos are too large to send together. Remove one or retake at lower quality.",
+      "formClosed": "This form is closed.",
+      "badRequest": "Something in the form looks wrong. Please check and try again.",
+      "notOpenYet": "Registration is not open yet. Please try again later.",
+      "fixFields": "Please fix the highlighted fields.",
+      "fixFiles": "Please check your ID photos.",
+      "rulesChanged": "The house rules were just updated. Please reload the page and read them again.",
+      "fileMissing": "This photo did not arrive. Please add it again.",
+      "file_empty": "This file is empty.",
+      "file_tooLarge": "This file is too large.",
+      "file_unsupportedType": "Use a JPEG, PNG or WebP photo, or a PDF.",
+      "saveFailed": "We could not save your details. Please try again.",
+      "tooMany": "Too many attempts. Please wait a few minutes.",
+      "loadFailed": "We could not load the form. Check your connection and try again.",
+      "network": "No connection. Please try again.",
+      "required": "This is required.",
+      "tooLong": "This is too long.",
+      "invalidEmail": "Enter a valid email address.",
+      "invalidLast4": "Enter exactly 4 letters or digits.",
+      "invalidTime": "Enter a valid time.",
+      "invalidDate": "Enter a valid date.",
+      "invalidAge": "Enter an age from 0 to 120.",
+      "tooManyGuests": "Too many guests on one form.",
+      "idTypeRequired": "Choose an ID type.",
+      "passportRequired": "Foreign guests must use a passport.",
+      "idPhotoRequired": "A photo of the front of the ID is required.",
+      "acceptRules": "Please accept the house rules.",
+      "signatureRequired": "Type your full name to sign."
     }
   }
 }

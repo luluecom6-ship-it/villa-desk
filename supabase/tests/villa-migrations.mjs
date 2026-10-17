@@ -1,4 +1,4 @@
-// Runs migrations 047-051 against an in-process Postgres (pglite) with small
+// Runs migrations 047-053 against an in-process Postgres (pglite) with small
 // stubs for Supabase auth/storage, then checks the PDR rules (stay refs,
 // automation_ready, immutability, RLS roles). No network or database needed.
 //   npm run test:migrations
@@ -51,14 +51,14 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
     try { await db.exec(fs.readFileSync(MIG + f, 'utf8')); }
     catch (e) { console.log(`ERROR applying ${f} (run ${pass_}):`, e.message); process.exit(1); }
   }
-  ok(`apply 047-051, run ${pass_}`, true);
+  ok(`apply 047-053, run ${pass_}`, true);
 }
 
 // --- Fixtures -------------------------------------------------------
@@ -207,6 +207,146 @@ try { await as(admin, `SELECT next_stay_ref('${acct}', 2026)`); } catch { nextRe
 ok('authenticated cannot call next_stay_ref directly', nextRefBlocked);
 const other_acct_user = await (async () => { const u = (await one(`INSERT INTO auth.users DEFAULT VALUES RETURNING id`)).id; await db.exec(`INSERT INTO profiles(user_id, account_id, account_role) VALUES ('${u}','${acct2}','owner')`); return u; })();
 ok('other account cannot see these stays', (await as(other_acct_user, `SELECT count(*)::int n FROM stays WHERE account_id='${acct}'`)).rows[0].n === 0);
+
+
+// =====================================================================
+// M2: public form RPC (052) and ID access log (053)
+// =====================================================================
+const rpc = async (token, form) =>
+  (await db.query(`SELECT public.submit_stay_form($1, $2::jsonb, $3, $4) AS r`, [token, JSON.stringify(form), '203.0.113.7', 'TestAgent/1.0'])).rows[0].r;
+const rpcRejects = async (name, token, form, re) => {
+  try { await rpc(token, form); ok(name, false, 'did not throw'); }
+  catch (e) { ok(name, re.test(e.message), e.message); }
+};
+const future = async (acctId, propId, phone, extraCols = '', extraVals = '') =>
+  one(`INSERT INTO stays(account_id, property_id, guest_name, guest_phone, checkin_at, checkout_at ${extraCols})
+       VALUES ('${acctId}', '${propId}', 'Form Guest', ${phone ? `'${phone}'` : 'NULL'}, now() + interval '2 days', now() + interval '4 days' ${extraVals})
+       RETURNING *`);
+const sha2 = 'b'.repeat(64);
+const doc = (st, key, side, name) => ({ guest_key: key, side, storage_path: `account-${st.account_id}/${st.id}/${name}`, content_type: 'image/jpeg', size_bytes: 1000, sha256: sha2 });
+const formFor = (st, rulesId, over = {}) => ({
+  lead: { full_name: 'Lead Guest', email: 'lead@example.com', nationality: 'Indian', address: 'Bengaluru', id_type: 'aadhaar', id_last4: '1234', ...(over.lead || {}) },
+  arrival: { expected_arrival_time: '15:30', vehicle_number: 'KA01AB1234', special_request: 'Late checkout please', purpose_of_visit: 'leisure', ...(over.arrival || {}) },
+  occupants: over.occupants ?? [],
+  documents: over.documents ?? [doc(st, 'lead', 'front', 'lead-front.jpg')],
+  acceptance: over.acceptance ?? { rules_version_id: rulesId, typed_name: 'Lead Guest' },
+});
+
+const sA = await future(acct, prop, '919111111111');
+const sB = await future(acct, prop, '919222222222');
+
+await rpcRejects('unknown token => not_found', 'nope-nope-nope', formFor(sA, rv), /stay_form:not_found/);
+
+// Happy path: lead + adult occupant + child, three files.
+const r1 = await rpc(sA.form_token, formFor(sA, rv, {
+  occupants: [
+    { client_key: 'o1', full_name: 'Adult Friend', age: 31, is_adult: true, id_type: 'passport', id_last4: '9876' },
+    { client_key: 'o2', full_name: 'Little Child', age: 8, is_adult: false },
+  ],
+  documents: [
+    doc(sA, 'lead', 'front', 'lead-front.jpg'),
+    doc(sA, 'lead', 'back', 'lead-back.jpg'),
+    doc(sA, 'o1', 'front', 'o1-front.jpg'),
+  ],
+}));
+ok('submit returns ok + reference', r1.ok === true && r1.stay_ref === sA.stay_ref && r1.edited === false, JSON.stringify(r1));
+const afterA = await one(`SELECT form_status, form_submitted_at, guest_email, vehicle_number, expected_arrival_time::text AS eta, purpose_of_visit FROM stays WHERE id='${sA.id}'`);
+ok('stay marked submitted with arrival details', afterA.form_status === 'submitted' && afterA.form_submitted_at && afterA.guest_email === 'lead@example.com' && afterA.vehicle_number === 'KA01AB1234' && afterA.eta.startsWith('15:30'), JSON.stringify(afterA));
+ok('lead + 2 occupants stored', (await one(`SELECT count(*)::int n FROM stay_guests WHERE stay_id='${sA.id}'`)).n === 3);
+ok('3 live documents stored', (await one(`SELECT count(*)::int n FROM stay_documents WHERE stay_id='${sA.id}' AND superseded_at IS NULL`)).n === 3);
+const acc = await one(`SELECT typed_name, ip_address, user_agent, rules_version_id FROM stay_acceptances WHERE stay_id='${sA.id}'`);
+ok('acceptance evidence recorded (name, IP, UA, rules version)', acc.typed_name === 'Lead Guest' && acc.ip_address === '203.0.113.7' && acc.user_agent === 'TestAgent/1.0' && acc.rules_version_id === rv);
+ok('stay phone is untouched by the form', (await one(`SELECT guest_phone FROM stays WHERE id='${sA.id}'`)).guest_phone === '919111111111');
+ok('lead mobile copied from the stay', (await one(`SELECT mobile FROM stay_guests WHERE stay_id='${sA.id}' AND role='lead'`)).mobile === '919111111111');
+
+// Rollback: an adult without an ID file leaves nothing behind.
+await rpcRejects('adult without ID file => id_required', sB.form_token, formFor(sB, rv, {
+  occupants: [{ client_key: 'o1', full_name: 'No ID Adult', age: 40, is_adult: true }],
+}), /stay_form:id_required/);
+ok('failed submit rolled back completely', (await one(`SELECT (SELECT count(*) FROM stay_guests WHERE stay_id='${sB.id}')::int AS g, (SELECT count(*) FROM stay_acceptances WHERE stay_id='${sB.id}')::int AS a, (SELECT form_status FROM stays WHERE id='${sB.id}') AS fs`)).g === 0);
+ok('failed submit left no acceptance and form still pending', (await one(`SELECT (SELECT count(*) FROM stay_acceptances WHERE stay_id='${sB.id}')::int AS a, (SELECT form_status FROM stays WHERE id='${sB.id}') AS fs`)).a === 0);
+
+await rpcRejects('file path outside the stay folder rejected', sB.form_token, formFor(sB, rv, {
+  documents: [{ ...doc(sB, 'lead', 'front', 'x.jpg'), storage_path: `account-${sB.account_id}/${sA.id}/stolen.jpg` }],
+}), /stay_form:bad_path/);
+await rpcRejects('document for unknown guest key rejected', sB.form_token, formFor(sB, rv, {
+  documents: [doc(sB, 'ghost', 'front', 'x.jpg')],
+}), /stay_form:bad_guest/);
+await rpcRejects('missing signature rejected', sB.form_token, formFor(sB, rv, { acceptance: { rules_version_id: rv, typed_name: ' ' } }), /stay_form:signature_required/);
+await rpcRejects('blank lead name rejected', sB.form_token, formFor(sB, rv, { lead: { full_name: '  ' } }), /stay_form:name_required/);
+await rpcRejects('wrong rules version rejected', sB.form_token, formFor(sB, '00000000-0000-4000-8000-000000000000'), /stay_form:rules_changed/);
+
+// Reopen and edit before check-in: supersede, never delete.
+const leadId = (await one(`SELECT id FROM stay_guests WHERE stay_id='${sA.id}' AND role='lead'`)).id;
+const occId = (await one(`SELECT id FROM stay_guests WHERE stay_id='${sA.id}' AND full_name='Adult Friend'`)).id;
+await db.exec(`UPDATE stay_guests SET id_verified_at = now() WHERE id='${leadId}'`);
+const before = (await one(`SELECT count(*)::int n FROM stay_documents WHERE stay_id='${sA.id}'`)).n;
+const r2 = await rpc(sA.form_token, formFor(sA, rv, {
+  lead: { full_name: 'Lead Guest Renamed' },
+  occupants: [
+    { id: occId, client_key: 'o1', full_name: 'Adult Friend', age: 32, is_adult: true, id_type: 'passport', id_last4: '9876' },
+    { client_key: 'o3', full_name: 'New Baby', age: 1, is_adult: false },
+  ],
+  documents: [doc(sA, 'lead', 'front', 'lead-front-v2.jpg')],
+  acceptance: { rules_version_id: '00000000-0000-4000-8000-000000000000', typed_name: 'Someone Else' }, // ignored: already signed
+}));
+ok('reopened form reports edited', r2.edited === true);
+ok('lead renamed in place (same row)', (await one(`SELECT full_name FROM stay_guests WHERE id='${leadId}'`)).full_name === 'Lead Guest Renamed');
+ok('existing occupant updated, new one added, none duplicated', (await one(`SELECT count(*)::int n FROM stay_guests WHERE stay_id='${sA.id}'`)).n === 4 && (await one(`SELECT age FROM stay_guests WHERE id='${occId}'`)).age === 32);
+ok('old front file superseded, new one live, nothing deleted',
+  (await one(`SELECT count(*)::int n FROM stay_documents WHERE stay_id='${sA.id}'`)).n === before + 1 &&
+  (await one(`SELECT count(*)::int n FROM stay_documents WHERE guest_id='${leadId}' AND side='front' AND superseded_at IS NOT NULL`)).n === 1 &&
+  (await one(`SELECT count(*)::int n FROM stay_documents WHERE guest_id='${leadId}' AND side='front' AND superseded_at IS NULL`)).n === 1);
+ok('back file untouched by a front-only re-upload', (await one(`SELECT count(*)::int n FROM stay_documents WHERE guest_id='${leadId}' AND side='back' AND superseded_at IS NULL`)).n === 1);
+ok('new upload clears the earlier verification', (await one(`SELECT id_verified_at FROM stay_guests WHERE id='${leadId}'`)).id_verified_at === null);
+ok('original signature kept on edit', (await one(`SELECT count(*)::int n, max(typed_name) AS nm FROM stay_acceptances WHERE stay_id='${sA.id}'`)).nm === 'Lead Guest');
+await rpcRejects('occupant id from another stay rejected', sA.form_token, formFor(sA, rv, {
+  occupants: [{ id: '00000000-0000-4000-8000-000000000001', client_key: 'x', full_name: 'Intruder', age: 5, is_adult: false }],
+  documents: [],
+}), /stay_form:bad_guest/);
+
+// After check-in an already-submitted form is read-only.
+await db.exec(`UPDATE stays SET checkin_at = now() - interval '1 hour' WHERE id='${sA.id}'`);
+await rpcRejects('submitted form is read-only after check-in', sA.form_token, formFor(sA, rv, { documents: [] }), /stay_form:closed/);
+
+// ...but a guest who has not submitted yet can still do so until the stay ends.
+const sD = await future(acct, prop, '919333333333');
+await db.exec(`UPDATE stays SET checkin_at = now() - interval '2 hours' WHERE id='${sD.id}'`);
+const rD = await rpc(sD.form_token, formFor(sD, rv));
+ok('first submission allowed after check-in time, before checkout', rD.ok === true);
+
+// Cancelled and finished stays look like unknown links.
+const sE = await future(acct, prop, '919444444444');
+await db.exec(`UPDATE stays SET status='cancelled' WHERE id='${sE.id}'`);
+await rpcRejects('cancelled stay => not_found', sE.form_token, formFor(sE, rv), /stay_form:not_found/);
+const sF = await future(acct, prop, '919555555555');
+await db.exec(`UPDATE stays SET checkin_at = now() - interval '3 days', checkout_at = now() - interval '1 day' WHERE id='${sF.id}'`);
+await rpcRejects('finished stay => not_found', sF.form_token, formFor(sF, rv), /stay_form:not_found/);
+
+// Rules: none published => no_rules; a newer version invalidates a stale form.
+const prop2 = (await one(`INSERT INTO properties(account_id, name) VALUES ('${acct2}', 'V2b') RETURNING id`)).id;
+const sG = await future(acct2, prop2, '919666666666');
+await rpcRejects('no published rules => no_rules', sG.form_token, formFor(sG, rv), /stay_form:no_rules/);
+const rv2a = (await one(`INSERT INTO house_rules_versions(account_id, version, body) VALUES ('${acct2}', 1, 'v1') RETURNING id`)).id;
+await db.exec(`INSERT INTO house_rules_versions(account_id, version, body) VALUES ('${acct2}', 2, 'v2')`);
+await rpcRejects('stale rules version => rules_changed', sG.form_token, formFor(sG, rv2a), /stay_form:rules_changed/);
+
+// The RPC is service-role only.
+let rpcBlocked = false;
+try { await as(admin, `SELECT public.submit_stay_form('x', '{}'::jsonb, '', '')`); } catch { rpcBlocked = true; }
+ok('signed-in users cannot call submit_stay_form directly', rpcBlocked);
+
+// Access log: append-only, admin-readable, no client writes.
+const docId = (await one(`SELECT id FROM stay_documents WHERE stay_id='${sA.id}' AND superseded_at IS NULL LIMIT 1`)).id;
+await db.exec(`INSERT INTO document_access_log(account_id, stay_id, document_id, opened_by, opened_role) VALUES ('${acct}','${sA.id}','${docId}','${admin}','admin')`);
+await rejects('access log rows cannot be edited', `UPDATE document_access_log SET opened_role = 'owner'`, /immutable/);
+await rejects('access log rows cannot be deleted', `DELETE FROM document_access_log`, /cannot be deleted/);
+ok('admin can read the access log', (await count(admin, 'document_access_log')) === 1);
+ok('caretaker cannot read the access log', (await count(agent, 'document_access_log')) === 0);
+let logWriteBlocked = false;
+try { await as(admin, `INSERT INTO document_access_log(account_id, stay_id, document_id) VALUES ('${acct}','${sA.id}','${docId}')`); } catch { logWriteBlocked = true; }
+ok('signed-in users cannot write the access log', logWriteBlocked);
+await rejects('a document with log entries cannot be deleted', `DELETE FROM stay_documents WHERE id='${docId}'`, /foreign key|violates/i);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

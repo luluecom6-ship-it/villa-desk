@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { Check, Copy, ExternalLink, Loader2, Pencil } from 'lucide-react'
+import { Check, Copy, ExternalLink, Eye, Loader2, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -63,6 +63,10 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [phoneDraft, setPhoneDraft] = useState('')
   const [copied, setCopied] = useState(false)
+  const [viewer, setViewer] = useState<{ url: string; contentType: string; label: string } | null>(null)
+  const [openingDoc, setOpeningDoc] = useState<string | null>(null)
+  const [rejectFor, setRejectFor] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   const load = useCallback(async () => {
     if (!stayId) return
@@ -106,6 +110,53 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
         return false
       }
       if (successMessage) toast.success(successMessage)
+      await load()
+      onChanged()
+      return true
+    } catch {
+      toast.error(t('toast.saveFailed'))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // One click = one signed link = one logged open (PDR 13.3). The link lives
+  // 60 seconds, so it is requested only when the person asks to view.
+  async function openDocument(docId: string, label: string) {
+    if (!stayId) return
+    setOpeningDoc(docId)
+    try {
+      const res = await fetch(`/api/stays/${stayId}/documents/${docId}/url`, { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.url) {
+        toast.error(json.error ?? t('toast.documentFailed'))
+        return
+      }
+      setViewer({ url: json.url, contentType: json.content_type ?? '', label })
+    } catch {
+      toast.error(t('toast.documentFailed'))
+    } finally {
+      setOpeningDoc(null)
+    }
+  }
+
+  async function review(guestId: string, action: 'verify' | 'reject', reason?: string): Promise<boolean> {
+    if (!stayId) return false
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/stays/${stayId}/guests/${guestId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, reason }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const firstField = json.fields ? Object.values(json.fields as Record<string, string>)[0] : null
+        toast.error(firstField ?? json.error ?? t('toast.saveFailed'))
+        return false
+      }
+      toast.success(action === 'verify' ? t('toast.idVerified') : t('toast.idRejected'))
       await load()
       onChanged()
       return true
@@ -270,6 +321,89 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                                     : ''}
                             </span>
                           </div>
+                          {isAdmin && (() => {
+                            const docs = (detail?.documents ?? []).filter((d) => d.guest_id === g.id)
+                            if (docs.length === 0 && !g.is_adult) return null
+                            return (
+                              <div className="mt-2 space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {docs.map((d) => (
+                                    <Button
+                                      key={d.id}
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={openingDoc === d.id}
+                                      onClick={() =>
+                                        void openDocument(d.id, `${g.full_name} · ${d.side === 'back' ? t('drawer.idBack') : t('drawer.idFront')}`)
+                                      }
+                                    >
+                                      {openingDoc === d.id ? <Loader2 className="size-3.5 animate-spin" /> : <Eye className="size-3.5" />}
+                                      {d.side === 'back' ? t('drawer.viewBack') : t('drawer.viewFront')}
+                                    </Button>
+                                  ))}
+                                  {docs.length === 0 && g.is_adult && (
+                                    <span className="text-xs text-muted-foreground">{t('drawer.noIdFile')}</span>
+                                  )}
+                                </div>
+                                {g.is_adult && docs.some((d) => d.side === 'front') && (
+                                  rejectFor === g.id ? (
+                                    <div className="space-y-2">
+                                      <Input
+                                        value={rejectReason}
+                                        onChange={(e) => setRejectReason(e.target.value)}
+                                        placeholder={t('drawer.rejectReasonPlaceholder')}
+                                        maxLength={300}
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="destructive"
+                                          disabled={busy || rejectReason.trim().length < 3}
+                                          onClick={async () => {
+                                            if (await review(g.id, 'reject', rejectReason)) {
+                                              setRejectFor(null)
+                                              setRejectReason('')
+                                            }
+                                          }}
+                                        >
+                                          {t('drawer.confirmReject')}
+                                        </Button>
+                                        <Button type="button" size="sm" variant="ghost" onClick={() => setRejectFor(null)}>
+                                          {t('drawer.cancelReject')}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex gap-2">
+                                      {!g.id_verified_at && (
+                                        <Button type="button" size="sm" disabled={busy} onClick={() => void review(g.id, 'verify')}>
+                                          <Check className="size-3.5" />
+                                          {t('drawer.verify')}
+                                        </Button>
+                                      )}
+                                      {!g.id_rejected_at && (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={busy}
+                                          onClick={() => {
+                                            setRejectFor(g.id)
+                                            setRejectReason('')
+                                          }}
+                                        >
+                                          <X className="size-3.5" />
+                                          {t('drawer.reject')}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            )
+                          })()}
                         </li>
                       ))}
                     </ul>
@@ -325,6 +459,30 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
           }}
         />
       )}
+
+      <Dialog open={!!viewer} onOpenChange={(o) => !o && setViewer(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viewer?.label}</DialogTitle>
+            <DialogDescription>{t('drawer.viewerNote')}</DialogDescription>
+          </DialogHeader>
+          {viewer &&
+            (viewer.contentType === 'application/pdf' ? (
+              <a
+                href={viewer.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary underline"
+              >
+                <ExternalLink className="size-4" />
+                {t('drawer.openPdf')}
+              </a>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
+              <img src={viewer.url} alt={viewer.label} className="max-h-[70vh] w-full rounded-md object-contain" />
+            ))}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogContent className="sm:max-w-sm">

@@ -26,6 +26,7 @@ import {
 } from '@/components/stays/stay-badges'
 import { StayDrawer, type DrawerStay } from '@/components/stays/stay-drawer'
 import { StayFormDialog } from '@/components/stays/stay-form-dialog'
+import { HouseRulesPanel } from '@/components/stays/house-rules'
 
 type ListStay = DrawerStay
 
@@ -96,6 +97,8 @@ export default function StaysPage() {
           </Button>
         )}
       </div>
+
+      <HouseRulesPanel isAdmin={isAdmin} />
 
       <div className="space-y-3">
         <div className="relative w-full sm:max-w-sm">

@@ -41,6 +41,23 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   New registration, edit, detail drawer, pause automation, add/correct mobile, cancel);
   API /api/stays and /api/stays/[id]; `isAutomationAllowed` in src/lib/stays/automation.ts
   (not yet wired into a send function: that is M3).
-- Next: M2 public guest form /stay/<token>, ID camera/upload, signed-URL viewing, verify/reject.
-- Open: the 13 house rules text (Villa Forms Pack) is not seeded; the guest form needs it.
+- M2 (done, needs migrations 052 and 053 applied): public guest form at /stay/<token> (camera +
+  upload, images shrunk in the browser, ID type + last 4, foreign guest fields, house rules
+  acceptance with typed signature); API /api/public/stay/[token] (rate limited, token is the only
+  credential, neutral 404); transactional RPC `submit_stay_form`; private `stay-ids` uploads with
+  magic-byte checks; staff ID review in the stay drawer (signed 60-second link, every open written
+  to `document_access_log` first, fail closed; Verify / Reject); house rules editor on /stays
+  (append-only versions).
+- Migration numbering: shipped files are 047 to 053 in order. 052 = form submit RPC + superseded
+  IDs, 053 = document access log. The PDR's later migrations (messages, deposits, audit, ...) take
+  the next free numbers (054+), not the PDR's own numbers.
+- Limits: Vercel caps a request body at 4.5 MB, so one submit carries at most 4 MB of files and a
+  PDF at most 3 MB (PDR said 5 MB). Direct-to-storage upload would lift this. The form rate limit is
+  in-memory per server process (weak on serverless).
+- Deliberate exceptions: a failed submit removes only its own never-recorded uploads. Saved guests
+  and ID files are never removed by the form (replaced IDs are marked superseded).
+- Not built yet: staff attaching an ID on a guest's behalf; Form C data for occupants (lead only).
+- Next: M3 channels (Meta + Evolution), scheduler, wire `isAutomationAllowed` into the send function.
+- Open: the 13 house rules text is not published. Guests see "not open yet" until an admin
+  publishes it from the banner on /stays.
 - Stays UI strings are English in all four catalogues (es/pt/ko not translated yet).

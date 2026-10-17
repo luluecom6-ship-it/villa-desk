@@ -139,6 +139,11 @@ export const RATE_LIMITS = {
    *  enabling brute-force token enumeration. With 256-bit tokens the
    *  enumeration risk is theoretical; this is belt-and-braces. */
   invitationPeek: { limit: 30, windowMs: 60_000 },
+  /** villa-desk public guest form (`/api/public/stay/[token]`), per IP:
+   *  20 requests per 10 minutes (PDR 6.1). Covers opening the page and
+   *  every submit attempt, so a guest retrying a bad photo has room while
+   *  token guessing does not. Per-process like every bucket here. */
+  stayForm: { limit: 20, windowMs: 10 * 60_000 },
   /** Invitation redeem (authed, per-IP+user). Tighter than peek —
    *  successful redemption mutates two profiles and an invite row, so
    *  the abuse surface is "spam join attempts." */
