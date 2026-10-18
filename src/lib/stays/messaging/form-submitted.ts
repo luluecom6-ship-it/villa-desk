@@ -15,9 +15,9 @@ export async function notifyFormSubmitted(
 ): Promise<void> {
   const who = args.guestName ? ` (${firstName(args.guestName)})` : ''
   const title = `Form submitted: ${args.stayRef}${who}`
-  await notifyStaff(db, args.accountId, title, 'Open the stay, check the ID photos and verify or reject them.', { includeCaretakers: true })
+  await notifyStaff(db, args.accountId, title, 'Open the stay, check the ID photos and approve or reject them.', { includeCaretakers: true })
 
   const people = (await loadResponders(db, args.accountId)).filter((r) => r.available && r.alertPhone)
-  const text = `${title}\nPlease check the ID photos and verify: ${args.siteUrl}/stays`
+  const text = `${title}\nPlease check the ID photos and approve: ${args.siteUrl}/stays`
   await Promise.all(people.map((r) => whatsappTeamAlert(db, args.accountId, r.alertPhone as string, text)))
 }

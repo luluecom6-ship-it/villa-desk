@@ -31,7 +31,7 @@ export const DEFAULT_TEMPLATES: Record<MessageKey, string> = {
     'Hello {guest_first_name}, your guest registration for {stay_ref} is still pending (2 days to go): {form_url}',
   form_reminder_1d:
     'Hello {guest_first_name}, you arrive tomorrow and your registration for {stay_ref} is still pending. It takes 2 minutes: {form_url}',
-  id_alert_staff: 'IDs to verify before arrival: {stay_ref} ({guest_first_name}). Open the Stays page to review.',
+  id_alert_staff: 'IDs to approve before arrival: {stay_ref} ({guest_first_name}). Open the Stays page to review.',
   arrival_info:
     'Hello {guest_first_name}, we look forward to hosting you tomorrow. Address: {address}\nMap: {map_url}\n{directions}\nCheck-in from {checkin_time}. When you set off, reply READY.',
   access_details:
