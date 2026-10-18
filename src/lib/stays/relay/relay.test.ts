@@ -241,3 +241,16 @@ describe('context for the agent', () => {
     expect(text.match(/Can we come at noon/g)).toHaveLength(1) // the new message is not repeated as history
   })
 })
+
+describe('an agent who cannot be reached on WhatsApp', () => {
+  it('the owner gets a bell saying why, once', async () => {
+    m.sendText.mockRejectedValue(new Error('boom'))
+    db.tables.notifications = []
+    await open('Hello', 'G1')
+    await open('Hello again', 'G2')
+    const bells = db.tables.notifications.filter((n: any) => n.title.startsWith('Could not WhatsApp'))
+    expect(bells.length).toBeGreaterThan(0)
+    expect(new Set(bells.map((n: any) => n.user_id))).toEqual(new Set(['owner']))
+    expect(bells.filter((n: any) => n.user_id === 'owner')).toHaveLength(1) // not repeated within 30 minutes
+  })
+})

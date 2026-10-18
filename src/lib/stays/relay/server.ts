@@ -2,6 +2,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { connectionState, sendAudio, sendMedia, sendReaction, sendText, userJid } from '@/lib/evolution/client'
 import { kindForMime } from '@/lib/evolution/media'
+import { evolutionErrorCode } from '@/lib/evolution/transport'
 import { recordSend, sendGate } from '@/lib/evolution/safety-server'
 import { connFromRow, loadEvolutionConfig } from '@/lib/evolution/server'
 import { sendMessageToConversation } from '@/lib/whatsapp/send-message'
@@ -29,17 +30,17 @@ export interface RelayItem {
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-async function connection(db: SupabaseClient, accountId: string) {
+async function connection(db: SupabaseClient, accountId: string): Promise<{ conn: ReturnType<typeof connFromRow> | null; error: string | null }> {
   let cfg = await loadEvolutionConfig(accountId, db)
   if (!cfg) {
     console.error('[relay] not sent to team: no WhatsApp link set up')
-    return null
+    return { conn: null, error: 'evolution_not_configured' }
   }
   // The saved state can be stale (a missed webhook leaves "connecting"): ask Evolution before giving up.
   if (cfg.state !== 'open' && (!cfg.paused_at || cfg.paused_reason === 'logged_out')) {
     const live = await connectionState(connFromRow(cfg)).catch(() => 'unknown' as const)
     if (live === 'open') {
-      const resume = cfg.paused_reason === 'logged_out' // the pause came from the old link; it is live again
+      const resume = cfg.paused_reason === 'logged_out'
       await db.from('evolution_config').update({ state: 'open', ...(resume ? { paused_at: null, paused_reason: null } : {}) }).eq('account_id', accountId)
       cfg = { ...cfg, state: 'open', ...(resume ? { paused_at: null, paused_reason: null } : {}) }
     }
@@ -47,30 +48,43 @@ async function connection(db: SupabaseClient, accountId: string) {
   const gate = await sendGate(accountId, 'reply', { db, cfg })
   if (gate) {
     console.error('[relay] not sent to team:', gate.code)
-    return null
+    return { conn: null, error: `evolution_${gate.code}` }
   }
-  return connFromRow(cfg)
+  return { conn: connFromRow(cfg), error: null }
+}
+
+const failCode = (e: unknown): string => {
+  try {
+    return evolutionErrorCode(e)
+  } catch {
+    return 'send_error'
+  }
+}
+
+/** Send text to a team member's own WhatsApp. `id` is null if it could not be sent, with the reason in `error`. */
+export async function tellEx(db: SupabaseClient, accountId: string, phone: string, text: string): Promise<{ id: string | null; error: string | null }> {
+  try {
+    const { conn, error } = await connection(db, accountId)
+    if (!conn) return { id: null, error }
+    const { id } = await sendText(conn, phone, text)
+    await recordSend(accountId, { ok: true, kind: 'reply', phone }, db)
+    return { id: id ?? `tell-${Date.now()}`, error: null }
+  } catch (e) {
+    console.error('[relay] could not message a team member:', failCode(e))
+    return { id: null, error: failCode(e) }
+  }
 }
 
 /** Send text to a team member's own WhatsApp. Returns the WhatsApp message id, or null if it could not be sent. */
 export async function tell(db: SupabaseClient, accountId: string, phone: string, text: string): Promise<string | null> {
-  try {
-    const conn = await connection(db, accountId)
-    if (!conn) return null
-    const { id } = await sendText(conn, phone, text)
-    await recordSend(accountId, { ok: true, kind: 'reply', phone }, db)
-    return id ?? `tell-${Date.now()}`
-  } catch (e) {
-    console.error('[relay] could not message a team member:', (e as { status?: number })?.status ?? 'error')
-    return null
-  }
+  return (await tellEx(db, accountId, phone, text)).id
 }
 
 /** Send a stored photo / video / file / voice note to a team member's WhatsApp, with the guest's context as the caption. */
-export async function tellMedia(db: SupabaseClient, accountId: string, phone: string, media: { url: string; mime: string | null }, caption: string): Promise<string | null> {
+export async function tellMediaEx(db: SupabaseClient, accountId: string, phone: string, media: { url: string; mime: string | null }, caption: string): Promise<{ id: string | null; error: string | null }> {
   try {
-    const conn = await connection(db, accountId)
-    if (!conn) return null
+    const { conn, error } = await connection(db, accountId)
+    if (!conn) return { id: null, error }
     const kind = kindForMime(media.mime)
     let id: string | null
     if (kind === 'audio') {
@@ -81,10 +95,38 @@ export async function tellMedia(db: SupabaseClient, accountId: string, phone: st
       id = (await sendMedia(conn, phone, { kind, url: media.url, caption })).id
     }
     await recordSend(accountId, { ok: true, kind: 'reply', phone }, db)
-    return id ?? `tell-${Date.now()}`
+    return { id: id ?? `tell-${Date.now()}`, error: null }
   } catch (e) {
-    console.error('[relay] could not send media to a team member:', (e as { status?: number })?.status ?? 'error')
-    return null
+    console.error('[relay] could not send media to a team member:', failCode(e))
+    return { id: null, error: failCode(e) }
+  }
+}
+
+export async function tellMedia(db: SupabaseClient, accountId: string, phone: string, media: { url: string; mime: string | null }, caption: string): Promise<string | null> {
+  return (await tellMediaEx(db, accountId, phone, media, caption)).id
+}
+
+const PLAIN: Record<string, string> = {
+  evolution_400_number_not_on_whatsapp: 'that number is not on WhatsApp (check the country code in Settings → Profile → Guest messages)',
+  evolution_not_configured: 'the villa WhatsApp number is not linked (Settings → WhatsApp link)',
+  evolution_paused: 'sending is paused (Settings → WhatsApp link → Resume)',
+  evolution_disconnected: 'the villa WhatsApp number is not connected (Settings → WhatsApp link)',
+  evolution_unreachable: 'the Evolution server could not be reached',
+}
+
+/** Tell the owner/admins, in the app, that a team member could not be reached on WhatsApp (at most once per 30 minutes per person). */
+async function reportUnreachable(db: SupabaseClient, accountId: string, who: Responder, error: string): Promise<void> {
+  try {
+    const title = `Could not WhatsApp ${who.name ?? 'a team member'}`
+    const since = new Date(Date.now() - 30 * 60_000).toISOString()
+    const { data: dup } = await db.from('notifications').select('id').eq('account_id', accountId).eq('title', title).gte('created_at', since).limit(1)
+    if (dup && dup.length > 0) return
+    const { data: admins } = await db.from('profiles').select('user_id').eq('account_id', accountId).in('account_role', ['owner', 'admin'])
+    const reason = PLAIN[error] ?? `WhatsApp error ${error}`
+    const rows = (admins ?? []).map((a: any) => ({ account_id: accountId, user_id: a.user_id, type: 'stay_alert', created_at: new Date().toISOString(), title, body: `A guest message was not copied to their WhatsApp: ${reason}.`.slice(0, 300) }))
+    if (rows.length > 0) await db.from('notifications').insert(rows)
+  } catch {
+    /* best effort */
   }
 }
 
@@ -157,10 +199,13 @@ export async function forwardToResponder(
     const label = item.mediaType ? `[${kindForMime(item.mediaType)}]` : null
     const body = [label, item.text ? clip(item.text, 1500) : null].filter(Boolean).join(' ') || null
     const text = forwardText({ code, card, body, intro: args.intro && i === 0, movedFrom: i === 0 ? args.movedFrom : null, history: i === 0 ? history : [] })
-    const id = item.mediaUrl
-      ? await tellMedia(db, args.accountId, args.to.alertPhone, { url: item.mediaUrl, mime: item.mediaType ?? null }, text)
-      : await tell(db, args.accountId, args.to.alertPhone, text)
-    if (!id) continue
+    const { id, error } = item.mediaUrl
+      ? await tellMediaEx(db, args.accountId, args.to.alertPhone, { url: item.mediaUrl, mime: item.mediaType ?? null }, text)
+      : await tellEx(db, args.accountId, args.to.alertPhone, text)
+    if (!id) {
+      if (error) await reportUnreachable(db, args.accountId, args.to, error)
+      continue
+    }
     sent++
     await db.from('relay_forwards').insert({
       account_id: args.accountId,
@@ -252,7 +297,7 @@ export async function onAgentMessage(
   const cmd = parseAgentMessage(msg.text)
   const react = async (emoji: string) => {
     try {
-      const conn = await connection(db, accountId)
+      const { conn } = await connection(db, accountId)
       if (conn) await sendReaction(conn, { remoteJid: userJid(phone), fromMe: false, id: msg.id }, emoji)
     } catch {
       /* a reaction is a courtesy */
