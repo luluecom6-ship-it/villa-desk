@@ -84,6 +84,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   `sendMessageToConversation` sends staff inbox messages on Evolution for evolution chats. Logs
   (`evolution_send_log`, `evolution_event_log`) are append-only, last 4 digits only. Docs: docs/villa-evolution.md.
   Not on this channel: flows, automations, AI bot, inbound media storage, templates (plain text only).
+- Immediate sends: a new registration / corrected mobile kicks the scheduler (`kickStayScheduler`), the Stays list kicks it lazily (1/min), and a rejected ID sends `sendIdRejectedMessage` at once (any hour, reason in the guest message only, staff notified if it cannot be sent).
 - M3 still to do: property settings screen (address, map, access text, templates editor).
 - Next after M3: M4 deposits, audit log, hardening; M5 checklists and damage report.
 - Open: house rules are not published yet. The editor on /stays is pre-filled with the 13 rules from

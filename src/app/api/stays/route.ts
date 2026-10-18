@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { kickStayScheduler } from '@/lib/stays/messaging/kick'
 import {
   getCurrentAccount,
   requireRole,
@@ -17,6 +18,8 @@ import {
   linkContact,
 } from '@/lib/stays/server'
 import type { StayWithGuests } from '@/lib/stays/types'
+
+export const maxDuration = 60
 
 const t = getT('Stays')
 
@@ -43,6 +46,10 @@ export async function GET(request: Request) {
       .order('checkin_at', { ascending: false })
       .limit(1000)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // While staff use the app, keep scheduled messages moving (once a minute at most).
+    const requestUrl = request.url
+    after(() => kickStayScheduler(requestUrl, { lazy: true }))
 
     const all = (data ?? []) as StayWithGuests[]
     const now = new Date()
@@ -124,6 +131,12 @@ export async function POST(request: Request) {
         .ilike('external_booking_ref', input.external_booking_ref.replace(/[\\%_]/g, '\\$&'))
         .neq('id', data.id)
       if ((count ?? 0) > 0) warnings.push(t('errors.duplicateBookingRef'))
+    }
+
+    // A registered stay (it has a mobile number) sends its first message now.
+    if (data.guest_phone) {
+      const requestUrl = request.url
+      after(() => kickStayScheduler(requestUrl))
     }
 
     return NextResponse.json(

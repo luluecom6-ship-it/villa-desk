@@ -40,3 +40,15 @@ Calling it twice in a row is safe: each message is sent once.
    (parameter order is in `META_TEMPLATE_PARAMS`). Without a template name the message is sent
    as free text, which Meta only delivers inside the 24-hour window.
 4. Evolution is not ported yet, so every stay message goes out on Meta for now.
+
+## Sends that do not wait for the cron
+
+- **New registration with a mobile number** (or a corrected number): the scheduler runs at once, so the
+  form-link message goes out immediately. Inside the 09:00 to 20:00 IST window only; outside it the message
+  waits until 09:00 (PDR rule).
+- **While staff use the app**, opening the Stays list also runs the scheduler (at most once a minute).
+- **ID rejected:** the guest gets a WhatsApp straight away with the reason and the link to upload again,
+  at any hour. If it cannot be sent (number paused or disconnected) staff get a notification to message the
+  guest by hand.
+- The external cron above is still needed for the quiet hours and for timed messages (reminders the day
+  before, check-out, review) when nobody has the app open.

@@ -1,6 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { supabaseAdmin } from '@/lib/automations/admin-client'
+import { sendIdRejectedMessage } from '@/lib/stays/messaging/id-rejected'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { getT } from '@/lib/i18n/translate'
+
+export const maxDuration = 60
 
 const t = getT('Stays')
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -78,6 +82,17 @@ export async function POST(
       .single()
     if (error || !data) {
       return NextResponse.json({ error: error?.message ?? t('errors.updateFailed') }, { status: 500 })
+    }
+    if (action === 'reject') {
+      // Tell the guest straight away (WhatsApp), with the reason and the upload link.
+      const accountId = ctx.accountId
+      after(async () => {
+        try {
+          await sendIdRejectedMessage(supabaseAdmin(), { accountId, stayId: id, guestId: gid, reason, requestUrl: request.url })
+        } catch (e) {
+          console.error('[id-rejected] message failed:', (e as { code?: string })?.code ?? 'error')
+        }
+      })
     }
     return NextResponse.json({ guest: data })
   } catch (err) {

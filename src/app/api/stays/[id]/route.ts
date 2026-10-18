@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { kickStayScheduler } from '@/lib/stays/messaging/kick'
 import {
   getCurrentAccount,
   requireRole,
@@ -14,6 +15,8 @@ import {
   linkContact,
 } from '@/lib/stays/server'
 import type { StayWithGuests } from '@/lib/stays/types'
+
+export const maxDuration = 60
 
 const t = getT('Stays')
 
@@ -160,6 +163,12 @@ export async function PATCH(
     }
     if (error || !data) {
       return NextResponse.json({ error: error?.message ?? t('errors.updateFailed') }, { status: 500 })
+    }
+
+    // A new or corrected mobile number turns automation on: send what is due now.
+    if (typeof patch.guest_phone === 'string') {
+      const requestUrl = request.url
+      after(() => kickStayScheduler(requestUrl))
     }
 
     return NextResponse.json({
