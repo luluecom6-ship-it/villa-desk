@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- rows from untyped supabase selects */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { sendAudio, sendMedia, sendReaction, sendText, userJid } from '@/lib/evolution/client'
+import { connectionState, sendAudio, sendMedia, sendReaction, sendText, userJid } from '@/lib/evolution/client'
 import { kindForMime } from '@/lib/evolution/media'
 import { recordSend, sendGate } from '@/lib/evolution/safety-server'
 import { connFromRow, loadEvolutionConfig } from '@/lib/evolution/server'
@@ -30,9 +30,24 @@ export interface RelayItem {
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
 async function connection(db: SupabaseClient, accountId: string) {
-  const cfg = await loadEvolutionConfig(accountId, db)
-  if (!cfg) return null
-  if (await sendGate(accountId, 'reply', { db, cfg })) return null // not connected / paused
+  let cfg = await loadEvolutionConfig(accountId, db)
+  if (!cfg) {
+    console.error('[relay] not sent to team: no WhatsApp link set up')
+    return null
+  }
+  // The saved state can be stale (a missed webhook leaves "connecting"): ask Evolution before giving up.
+  if (cfg.state !== 'open' && cfg.state !== 'logged_out' && !cfg.paused_at) {
+    const live = await connectionState(connFromRow(cfg)).catch(() => 'unknown' as const)
+    if (live === 'open') {
+      await db.from('evolution_config').update({ state: 'open' }).eq('account_id', accountId)
+      cfg = { ...cfg, state: 'open' }
+    }
+  }
+  const gate = await sendGate(accountId, 'reply', { db, cfg })
+  if (gate) {
+    console.error('[relay] not sent to team:', gate.code)
+    return null
+  }
   return connFromRow(cfg)
 }
 

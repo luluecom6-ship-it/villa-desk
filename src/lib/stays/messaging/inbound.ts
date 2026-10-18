@@ -69,8 +69,9 @@ export async function handleStayInbound(
   if (!stay) {
     // Not registered: the stay logic does nothing and sends nothing.
     const suppress = await villaModeOn(db, args.accountId)
-    if (suppress) {
-      // Staff still see it: an unknown number writing to the villa is chased like any guest message.
+    // Staff always see it: an unknown number writing to the villa is chased like any guest
+    // message, whether or not villa mode is on.
+    {
       if (args.conversationId) {
         await openEscalation(db, {
           accountId: args.accountId,
@@ -85,15 +86,17 @@ export async function handleStayInbound(
           now,
         }).catch((e) => console.error('[escalation] open failed:', (e as { code?: string })?.code ?? 'error'))
       }
-      await logStayMessage(db, {
-        accountId: args.accountId,
-        stayId: null,
-        messageKey: null,
-        direction: 'in',
-        outcome: 'inbound_ignored',
-        reason: 'not_on_allow_list',
-        phone: args.phone,
-      })
+      if (suppress) {
+        await logStayMessage(db, {
+          accountId: args.accountId,
+          stayId: null,
+          messageKey: null,
+          direction: 'in',
+          outcome: 'inbound_ignored',
+          reason: 'not_on_allow_list',
+          phone: args.phone,
+        })
+      }
     }
     return { registered: false, handled: false, suppressAutomation: suppress }
   }

@@ -104,7 +104,10 @@ export async function openEscalation(
   const lastUser = [...(past ?? [])].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))[0]?.user_id
   const previous = chain.find((m) => m.userId === lastUser)
   const first = previous ?? nextResponder(chain, [])
-  if (!first) return 'nobody'
+  if (!first) {
+    console.error('[escalation] nobody to tell: no team member is on duty')
+    return 'nobody'
+  }
 
   const minutes = await escalateMinutes(db, args.accountId)
   const { error } = await db.from('conversation_escalations').insert({
@@ -117,7 +120,12 @@ export async function openEscalation(
     last_notified_at: now.toISOString(),
     due_at: new Date(now.getTime() + minutes * 60_000).toISOString(),
   })
-  if (error) return 'already_open' // lost a race with another delivery of the same message
+  if (error) {
+    // 23505 = another delivery of the same message won the race. Anything else (a missing table: migration 058 not applied) must be visible.
+    if (error.code !== '23505') console.error('[escalation] could not open:', error.code, error.message)
+    return 'already_open'
+  }
+  if (!first.alertPhone) console.error('[escalation] first responder has no WhatsApp number set; bell only')
   await alertResponder(db, args.accountId, first, { label: args.label, preview: args.preview, siteUrl: args.siteUrl, escalated: false, conversationId: args.conversationId, items: [item] })
   return 'opened'
 }
