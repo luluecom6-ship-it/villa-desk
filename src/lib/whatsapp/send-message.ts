@@ -441,6 +441,13 @@ export async function sendMessageToConversation(
         evolution_paused: 'Sending is paused. Open Settings → WhatsApp link and press Resume.',
         evolution_disconnected: 'The villa WhatsApp number is not connected. Open Settings → WhatsApp link and reconnect.',
       };
+      if (/number_not_on_whatsapp/.test(code)) {
+        throw new SendMessageError(
+          'evolution_error',
+          `WhatsApp says +${sanitizedPhone} is not a WhatsApp number. This chat probably has a wrong number (often a missing country code). Correct the guest's mobile on the stay, then reply from the new chat.`,
+          502,
+        );
+      }
       throw new SendMessageError('evolution_error', plain[code] ?? `WhatsApp app number: ${code}`, 502);
     }
   } else {
