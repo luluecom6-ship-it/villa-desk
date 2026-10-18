@@ -19,6 +19,19 @@ export class EvolutionSendError extends Error {
 
 const WAIT_CODES = new Set(['paused', 'outside_hours', 'daily_limit', 'disconnected'])
 
+/** A 400 from Evolution says why in its body; turn the common reasons into a short readable code (no numbers in it). */
+export function evolutionErrorCode(e: unknown): string {
+  const status = e instanceof EvolutionError ? e.status : 0
+  if (!status) return 'evolution_unreachable'
+  if (status === 400 && e instanceof EvolutionError) {
+    const raw = JSON.stringify(e.body ?? e.message ?? '')
+    if (/"exists"\s*:\s*false/.test(raw)) return 'evolution_400_number_not_on_whatsapp'
+    const msg = /"message"\s*:\s*\[?\s*"([^"]{3,80})"/.exec(raw)?.[1]
+    if (msg) return `evolution_400_${msg.replace(/\d+/g, '').replace(/[^A-Za-z]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30)}`
+  }
+  return `evolution_${status}`
+}
+
 export const evolutionStayTransport: StayTransport = async ({ db, accountId, phone, guestName, text, kind }) => {
   // 'immediate' (first form link) is business-initiated like 'scheduled': it counts toward the daily
   // limit but ignores the sending hours.
@@ -68,7 +81,7 @@ export const evolutionStayTransport: StayTransport = async ({ db, accountId, pho
     return { messageId }
   } catch (e) {
     const status = e instanceof EvolutionError ? e.status : 0
-    const code = status ? `evolution_${status}` : 'evolution_unreachable'
+    const code = evolutionErrorCode(e)
     await recordSend(accountId, { ok: false, kind: sendKind, phone, errorCode: code }, db)
     // 401 = logged out, 403 = refused by WhatsApp: stop at once.
     if (status === 401 || status === 403) await pauseNumber(accountId, status === 401 ? 'logged_out' : 'refused_by_whatsapp', db).catch(() => undefined)
@@ -107,7 +120,7 @@ export async function sendStaffViaEvolution(
   } catch (e) {
     if (e instanceof EvolutionSendError) throw e
     const status = e instanceof EvolutionError ? e.status : 0
-    const code = status ? `evolution_${status}` : 'evolution_unreachable'
+    const code = evolutionErrorCode(e)
     await recordSend(accountId, { ok: false, kind: 'reply', phone: m.phone, errorCode: code }, db)
     if (status === 401 || status === 403) await pauseNumber(accountId, status === 401 ? 'logged_out' : 'refused_by_whatsapp', db).catch(() => undefined)
     throw new EvolutionSendError(code)

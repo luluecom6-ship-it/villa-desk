@@ -16,13 +16,13 @@ const m = vi.hoisted(() => ({
 vi.mock('./server', () => ({ loadEvolutionConfig: async () => m.cfg, connFromRow: () => ({ baseUrl: 'x', instance: 'i', apiKey: 'k' }) }))
 vi.mock('./safety-server', () => ({ sendGate: async () => m.gate, recordSend: m.recordSend, pauseNumber: m.pauseNumber, checkHealth: m.checkHealth }))
 vi.mock('./client', async () => {
-  class EvolutionError extends Error { constructor(msg: string, public status: number) { super(msg) } }
+  class EvolutionError extends Error { constructor(msg: string, public status: number, public body?: unknown) { super(msg) } }
   return { EvolutionError, sendText: m.sendText, sendMedia: vi.fn(), sendAudio: vi.fn(), connectionState: m.connectionState }
 })
 vi.mock('@/lib/whatsapp/resolve-conversation', () => ({ resolveConversationByPhone: async () => ({ conversationId: 'conv-1', contactId: 'c-1' }) }))
 
 import { EvolutionError } from './client'
-import { evolutionStayTransport } from './transport'
+import { evolutionStayTransport, evolutionErrorCode } from './transport'
 
 const args = (kind: 'scheduled' | 'reply') => ({ db: new FakeDb() as any, accountId: 'a', phone: '919876543210', guestName: 'Asha', text: 'hello', kind })
 
@@ -67,6 +67,12 @@ describe('Evolution transport for stay messages', () => {
     expect((await evolutionStayTransport(a)).messageId).toBe('WA3')
     expect(m.connectionState).toHaveBeenCalled()
     expect(a.db.tables.evolution_config[0].state).toBe('open')
+  })
+
+  it('explains a 400 from Evolution', () => {
+    expect(evolutionErrorCode(new EvolutionError('x', 400, { response: { message: [{ jid: '9198@s.whatsapp.net', exists: false, number: '9198' }] } }))).toBe('evolution_400_number_not_on_whatsapp')
+    expect(evolutionErrorCode(new EvolutionError('x', 400, { response: { message: ['Text is required'] } }))).toBe('evolution_400_Text_is_required')
+    expect(evolutionErrorCode(new EvolutionError('x', 502))).toBe('evolution_502')
   })
 
   it('a number that was never linked fails with a clear code (no silent fallback to Meta)', async () => {
