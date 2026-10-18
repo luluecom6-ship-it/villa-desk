@@ -436,7 +436,12 @@ export async function sendMessageToConversation(
       });
     } catch (err) {
       const code = (err as { code?: string }).code ?? 'send_error';
-      throw new SendMessageError('evolution_error', `WhatsApp app number: ${code}`, 502);
+      const plain: Record<string, string> = {
+        evolution_not_configured: 'The villa WhatsApp number is not linked. Open Settings → WhatsApp link, press connect and scan the code.',
+        evolution_paused: 'Sending is paused. Open Settings → WhatsApp link and press Resume.',
+        evolution_disconnected: 'The villa WhatsApp number is not connected. Open Settings → WhatsApp link and reconnect.',
+      };
+      throw new SendMessageError('evolution_error', plain[code] ?? `WhatsApp app number: ${code}`, 502);
     }
   } else {
   // Send via Meta — retry across phone-number variants if Meta rejects
