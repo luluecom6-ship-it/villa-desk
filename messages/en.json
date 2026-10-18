@@ -3196,7 +3196,7 @@
   },
   "GuestAlerts": {
     "title": "Guest messages",
-    "intro": "When a guest writes and needs a person, their message is sent to the first available caretaker's own WhatsApp. They swipe-reply there and the answer goes to the guest from the villa number. If nobody replies in time it moves to the next caretaker, then to the owner.",
+    "intro": "The team is told when a guest writes, when a registration is created and when a guest submits the form. Guest messages go to the first available caretaker's own WhatsApp: they swipe-reply there and the answer goes to the guest from the villa number. If nobody replies in time it moves to the next caretaker, then to the owner.",
     "available": "I am on duty and can take guest messages",
     "phone": "Your WhatsApp number",
     "phoneHint": "Digits with country code (e.g. 966572657189). Guest messages arrive on this WhatsApp from the villa number; reply to one and your answer goes to the guest. Send /help there for commands. Leave empty to get the bell in the app only.",
@@ -3204,6 +3204,15 @@
     "minutesHint": "Applies to everyone. A reply from your WhatsApp, the inbox or the villa phone stops the clock.",
     "save": "Save",
     "saved": "Saved.",
-    "failed": "Could not save. Please try again."
+    "failed": "Could not save. Please try again.",
+    "teamTitle": "Team WhatsApp numbers",
+    "teamHint": "Owner and admins can set the number and duty of every caretaker here. A person with no number only gets the bell in the app.",
+    "you": "you",
+    "teamOnDuty": "On duty (gets guest messages and alerts)",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "agent": "Caretaker"
+    }
   }
 }

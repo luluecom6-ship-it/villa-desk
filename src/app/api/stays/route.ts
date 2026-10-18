@@ -1,5 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { kickStayScheduler } from '@/lib/stays/messaging/kick'
+import { notifyStayCreated } from '@/lib/stays/messaging/form-submitted'
+import { supabaseAdmin } from '@/lib/automations/admin-client'
 import {
   getCurrentAccount,
   requireRole,
@@ -131,6 +133,26 @@ export async function POST(request: Request) {
         .ilike('external_booking_ref', input.external_booking_ref.replace(/[\\%_]/g, '\\$&'))
         .neq('id', data.id)
       if ((count ?? 0) > 0) warnings.push(t('errors.duplicateBookingRef'))
+    }
+
+    // Tell the rest of the team a registration was created.
+    {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '') || new URL(request.url).origin
+      after(async () => {
+        try {
+          await notifyStayCreated(supabaseAdmin(), {
+            accountId: ctx.accountId,
+            stayRef: data.stay_ref,
+            guestName: data.guest_name,
+            checkin: data.checkin_at,
+            formSent: !!data.guest_phone,
+            createdBy: ctx.userId,
+            siteUrl,
+          })
+        } catch (e) {
+          console.error('[stays] team alert failed:', (e as { code?: string })?.code ?? 'error')
+        }
+      })
     }
 
     // A registered stay (it has a mobile number) sends its first message now.

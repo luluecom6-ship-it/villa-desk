@@ -25,3 +25,31 @@ describe('form submitted alert', () => {
     expect(wa.mock.calls[0][3]).toContain('https://desk.test/stays')
   })
 })
+
+import { notifyStayCreated } from './form-submitted'
+
+describe('registration created alert', () => {
+  it('tells everyone except the person who created it, bell and WhatsApp', async () => {
+    wa.mockClear()
+    const db = new FakeDb() as any
+    db.tables.profiles = [
+      { user_id: 'owner', account_id: 'a', account_role: 'owner', available: true, alert_phone: '966500000001', created_at: '1' },
+      { user_id: 'care1', account_id: 'a', account_role: 'agent', available: true, alert_phone: '966500000002', created_at: '2' },
+      { user_id: 'care2', account_id: 'a', account_role: 'agent', available: false, alert_phone: '966500000003', created_at: '3' },
+    ]
+    await notifyStayCreated(db, { accountId: 'a', stayRef: 'MS-2026-002', guestName: 'Ravi Kumar', checkin: '2026-11-12T08:30:00Z', formSent: true, createdBy: 'owner', siteUrl: 'https://desk.test' })
+    expect(db.tables.notifications.map((n: any) => n.user_id).sort()).toEqual(['care1', 'care2'])
+    expect(db.tables.notifications[0].title).toBe('New registration: MS-2026-002 (Ravi)')
+    expect(wa).toHaveBeenCalledTimes(1) // care2 is off duty
+    expect(wa.mock.calls[0][2]).toBe('966500000002')
+    expect(wa.mock.calls[0][3]).toContain('form link is being sent')
+  })
+
+  it('says when there is no mobile number yet', async () => {
+    wa.mockClear()
+    const db = new FakeDb() as any
+    db.tables.profiles = [{ user_id: 'care1', account_id: 'a', account_role: 'agent', available: true, alert_phone: '966500000002', created_at: '2' }]
+    await notifyStayCreated(db, { accountId: 'a', stayRef: 'MS-2026-003', guestName: null, checkin: null, formSent: false, createdBy: 'someone', siteUrl: 'https://d.test' })
+    expect(db.tables.notifications[0].body).toContain('add it')
+  })
+})
