@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -429,6 +429,16 @@ await rejects('send log rows cannot be deleted', `DELETE FROM evolution_send_log
 await db.exec(`INSERT INTO evolution_event_log(account_id, event, outcome) VALUES ('${acct}','connection.update','open')`);
 await rejects('event log rows cannot be deleted', `DELETE FROM evolution_event_log`, /cannot be deleted/);
 await rejects('event log rows cannot be edited', `UPDATE evolution_event_log SET outcome='x'`, /immutable/);
+
+// ---- Migration 057: a signed-in admin can create a stay -----------------------
+let adminCreated = true;
+try {
+  await as(admin, `INSERT INTO stays(account_id, property_id, guest_name, guest_phone, checkin_at, checkout_at) VALUES ('${acct}', (SELECT id FROM properties WHERE account_id='${acct}' LIMIT 1), 'RLS Guest', '919800000001', now() + interval '2 days', now() + interval '4 days')`);
+} catch (e) { adminCreated = false; console.log(e.message); }
+ok('a signed-in admin can create a stay (stay_ref assigned by the trigger)', adminCreated);
+let directCall = false;
+try { await as(admin, `SELECT public.next_stay_ref('${acct}', 2026)`); directCall = true; } catch { directCall = false; }
+ok('signed-in users still cannot call next_stay_ref directly', !directCall);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

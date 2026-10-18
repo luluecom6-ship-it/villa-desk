@@ -71,6 +71,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   WhatsApp webhook; villa mode (`properties.villa_mode`) keeps flows, automations and the AI bot away
   from unregistered numbers (inbound in the webhook, outbound via `assertVillaSendAllowed`).
   Staff alerts use `notifications` type `stay_alert`. Stay drawer shows each stay's message queue.
+- Migration 057 fixes "permission denied for function next_stay_ref" (stays trigger now SECURITY DEFINER); needs applying.
 - M3 part 2 (done, needs migration 056): **Evolution is the working channel, Meta is parked** (code kept,
   `properties.default_channel` chooses; a guest's own channel `conversations.channel` wins for replies).
   Env vars `EVOLUTION_BASE_URL` + `EVOLUTION_API_KEY`; per-account instance token encrypted in
