@@ -52,7 +52,7 @@ export async function GET(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) return NextResponse.json({ error: t('errors.notFound') }, { status: 404 })
 
-    const [acceptance, documents, messages] = await Promise.all([
+    const [acceptance, documents, messages, reviews] = await Promise.all([
       ctx.supabase
         .from('stay_acceptances')
         .select('typed_name, accepted_at, ip_address, rules_version_id, house_rules_versions(version)')
@@ -73,6 +73,14 @@ export async function GET(
         .select('message_key, due_at, status, sent_at, attempts, last_error')
         .eq('stay_id', id)
         .order('due_at', { ascending: true }),
+      // Who approved or rejected each guest's ID, when, and why (caretakers and above).
+      canSeeIds
+        ? ctx.supabase
+            .from('stay_id_reviews')
+            .select('id, guest_id, action, reason, reviewer_name, created_at')
+            .eq('stay_id', id)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] as unknown[] }),
     ])
 
     return NextResponse.json({
@@ -83,6 +91,7 @@ export async function GET(
       acceptance: acceptance.data ?? null,
       documents: documents.data ?? [],
       messages: messages.data ?? [],
+      reviews: reviews.data ?? [],
     })
   } catch (err) {
     return toErrorResponse(err)

@@ -2864,7 +2864,7 @@
       "noIdFile": "No ID file uploaded yet",
       "verify": "Approve",
       "reject": "Reject",
-      "confirmReject": "Reject ID",
+      "confirmReject": "Submit",
       "cancelReject": "Cancel",
       "rejectReasonPlaceholder": "Reason shown to the guest (e.g. photo is blurry)",
       "viewerNote": "This link expires in 60 seconds and the view is logged.",
@@ -2894,7 +2894,13 @@
       "messagesNone": "No messages scheduled yet. They are queued once the stay has a mobile number.",
       "resend": "Resend",
       "sendNow": "Send now",
-      "resendRejected": "Resend ID message to guest"
+      "resendRejected": "Resend ID message to guest",
+      "reviewHistory": "ID review history",
+      "reviewHistoryNone": "No ID has been approved or rejected yet.",
+      "reviewApproved": "Approved",
+      "reviewRejected": "Rejected",
+      "reviewReason": "Reason: {reason}",
+      "reviewBy": "By {name}"
     },
     "cancel": {
       "title": "Cancel this stay?",

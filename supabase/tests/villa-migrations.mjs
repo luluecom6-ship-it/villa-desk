@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -454,6 +454,18 @@ ok('a new chase can open after the old one is resolved', true);
 await rejects('escalations are never deleted', `DELETE FROM conversation_escalations`, /cannot be deleted/);
 ok('caretaker can read escalations', (await count(agent, 'conversation_escalations')) === 2);
 ok('viewer cannot read escalations', (await count(viewer, 'conversation_escalations')) === 0);
+
+// ---- Migration 059: ID review history -----------------------------------------
+const stayR = (await one(`SELECT id FROM stays WHERE account_id='${acct}' LIMIT 1`)).id;
+const guestR = (await one(`INSERT INTO stay_guests(account_id, stay_id, role, full_name, is_adult) VALUES ('${acct}','${stayR}','lead','Review Guest', true) RETURNING id`)).id;
+await db.exec(`INSERT INTO stay_id_reviews(account_id, stay_id, guest_id, action, reason, reviewer_name) VALUES ('${acct}','${stayR}','${guestR}','rejected','Photo is blurry','Owner')`);
+await db.exec(`INSERT INTO stay_id_reviews(account_id, stay_id, guest_id, action) VALUES ('${acct}','${stayR}','${guestR}','approved')`);
+await rejects('a rejection must carry a reason', `INSERT INTO stay_id_reviews(account_id, stay_id, guest_id, action) VALUES ('${acct}','${stayR}','${guestR}','rejected')`, /check/i);
+await rejects('an approval carries no reason', `INSERT INTO stay_id_reviews(account_id, stay_id, guest_id, action, reason) VALUES ('${acct}','${stayR}','${guestR}','approved','x')`, /check/i);
+await rejects('review history is never edited', `UPDATE stay_id_reviews SET reason='changed'`, /immutable/);
+await rejects('review history is never deleted', `DELETE FROM stay_id_reviews`, /cannot be deleted/);
+ok('caretaker can read the review history', (await count(agent, 'stay_id_reviews')) === 2);
+ok('viewer cannot read the review history', (await count(viewer, 'stay_id_reviews')) === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

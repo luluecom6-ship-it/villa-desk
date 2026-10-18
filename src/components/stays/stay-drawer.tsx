@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { Check, Copy, ExternalLink, Eye, Loader2, Pencil, Send, X } from 'lucide-react'
+import { Check, CircleCheck, Copy, ExternalLink, Eye, Loader2, Pencil, Send, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -45,6 +45,7 @@ interface Detail {
     house_rules_versions: { version: number } | { version: number }[] | null
   } | null
   documents: Array<{ id: string; guest_id: string; side: string; content_type: string; size_bytes: number }>
+  reviews?: Array<{ id: string; guest_id: string; action: 'approved' | 'rejected'; reason: string | null; reviewer_name: string | null; created_at: string }>
   messages?: Array<{ message_key: string; due_at: string; status: string; sent_at: string | null; attempts: number; last_error: string | null }>
 }
 
@@ -334,7 +335,12 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                       {(stay.stay_guests ?? []).map((g) => (
                         <li key={g.id} className="rounded-lg border border-border p-2.5 text-sm">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium">{g.full_name}</span>
+                            <span className="flex items-center gap-1.5 font-medium">
+                              {g.id_verified_at && (
+                                <CircleCheck className="size-4 text-emerald-600 dark:text-emerald-400" aria-label={t('idStatus.verified')} />
+                              )}
+                              {g.full_name}
+                            </span>
                             <span className="text-xs text-muted-foreground">
                               {g.role === 'lead' ? t('drawer.lead') : g.is_adult ? t('drawer.adult') : t('drawer.child')}
                             </span>
@@ -522,6 +528,41 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                     <p className="text-sm text-muted-foreground">{t('drawer.notAccepted')}</p>
                   )}
                 </Section>
+
+                {/* What happened at each ID review, newest first (kept permanently) */}
+                {canIds && (
+                  <Section title={t('drawer.reviewHistory')}>
+                    {(detail?.reviews ?? []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">{t('drawer.reviewHistoryNone')}</p>
+                    ) : (
+                      <ul className="space-y-2 text-sm">
+                        {(detail?.reviews ?? []).map((r) => {
+                          const who = (stay.stay_guests ?? []).find((g) => g.id === r.guest_id)?.full_name ?? ''
+                          return (
+                            <li key={r.id} className="rounded-lg border border-border p-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="flex items-center gap-1.5 font-medium">
+                                  {r.action === 'approved' ? (
+                                    <CircleCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
+                                  ) : (
+                                    <X className="size-4 text-red-600 dark:text-red-400" />
+                                  )}
+                                  {r.action === 'approved' ? t('drawer.reviewApproved') : t('drawer.reviewRejected')}
+                                  {who ? ` · ${who}` : ''}
+                                </span>
+                                <span className="shrink-0 text-xs text-muted-foreground">{formatIst(r.created_at)}</span>
+                              </div>
+                              {r.reason && <p className="mt-1">{t('drawer.reviewReason', { reason: r.reason })}</p>}
+                              {r.reviewer_name && (
+                                <p className="mt-0.5 text-xs text-muted-foreground">{t('drawer.reviewBy', { name: r.reviewer_name })}</p>
+                              )}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </Section>
+                )}
 
                 {canEdit && (
                   <div className="border-t border-border pt-4">

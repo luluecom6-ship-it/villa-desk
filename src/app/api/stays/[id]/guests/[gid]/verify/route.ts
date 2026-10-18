@@ -83,6 +83,24 @@ export async function POST(
     if (error || !data) {
       return NextResponse.json({ error: error?.message ?? t('errors.updateFailed') }, { status: 500 })
     }
+    // Permanent history of who decided what and why (migration 059). A failed write
+    // must not undo the review itself; it is logged and the review stands.
+    try {
+      const admin = supabaseAdmin()
+      const { data: me } = await admin.from('profiles').select('full_name').eq('user_id', ctx.userId).maybeSingle()
+      const { error: histErr } = await admin.from('stay_id_reviews').insert({
+        account_id: ctx.accountId,
+        stay_id: id,
+        guest_id: gid,
+        action: action === 'verify' ? 'approved' : 'rejected',
+        reason: action === 'reject' ? reason : null,
+        reviewed_by: ctx.userId,
+        reviewer_name: (me as { full_name?: string } | null)?.full_name ?? null,
+      })
+      if (histErr) console.error('[id-review] history write failed:', histErr.code)
+    } catch {
+      console.error('[id-review] history write failed')
+    }
     if (action === 'reject') {
       // Tell the guest straight away (WhatsApp), with the reason and the upload link.
       const accountId = ctx.accountId

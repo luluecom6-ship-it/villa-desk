@@ -96,6 +96,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   (Settings -> Your profile card). Rows are resolved, never deleted; no guest text stored.
 - Resend (caretaker+): POST /api/stays/[id]/resend `{messageKey}` or `{guestId}` (src/lib/stays/messaging/resend.ts) sends a guest message again, ignoring "still needed" conditions but not the allow-list gate; buttons in the stay drawer (message list, rejected ID). Answers why when it cannot send.
 - Form submitted alert: after `submit_stay_form` succeeds the public route (via `after()`) runs `notifyFormSubmitted` (bell for owner/admin/caretakers + WhatsApp to on-duty people with an alert number; stay ref + first name only). The Stays list polls every 30 s while visible.
+- ID review history (migration 059): append-only `stay_id_reviews` (approved/rejected, reason, reviewer name), written by the verify route, shown at the bottom of the stay drawer; green tick on approved guests and on the Approved ID badge. UI says "Approve" (API action is still `verify`).
 - M3 still to do: property settings screen (address, map, access text, templates editor).
 - Next after M3: M4 deposits, audit log, hardening; M5 checklists and damage report.
 - Open: house rules are not published yet. The editor on /stays is pre-filled with the 13 rules from

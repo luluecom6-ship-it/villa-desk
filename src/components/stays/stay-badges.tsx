@@ -1,11 +1,12 @@
 'use client'
 
+import { CircleCheck } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { AutomationState, IdStatus, StayStatus } from '@/lib/stays/types'
 
-const BASE = 'whitespace-nowrap'
+const BASE = 'inline-flex items-center gap-1 whitespace-nowrap'
 
 export function StatusBadge({ status }: { status: StayStatus }) {
   const t = useTranslations('Stays')
@@ -57,6 +58,7 @@ export function IdBadge({ status }: { status: IdStatus }) {
   }
   return (
     <Badge variant="outline" className={cn(BASE, tone[status])}>
+      {status === 'verified' && <CircleCheck className="size-3.5" aria-hidden />}
       {t(`idStatus.${status}`)}
     </Badge>
   )
