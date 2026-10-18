@@ -252,9 +252,9 @@ export function StayFormDialog({ open, onOpenChange, stay, onSaved }: Props) {
           </Field>
 
           <Field label={t('form.mobile')} error={errorFor('guest_phone')} hint={noMobile ? t('form.mobileDraftHint') : t('form.mobileHint')}>
-            <div className="flex gap-2">
+            <div className="flex min-w-0 gap-2">
               <select
-                className={`${SELECT_CLASS} w-28 shrink-0`}
+                className={`${SELECT_CLASS.replace('w-full', 'w-28')} shrink-0`}
                 value={countryCode}
                 onChange={(e) => setCountryCode(e.target.value)}
                 aria-label={t('form.countryCode')}
@@ -269,6 +269,7 @@ export function StayFormDialog({ open, onOpenChange, stay, onSaved }: Props) {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="98765 43210"
+                className="min-w-0 flex-1"
                 aria-invalid={!!errorFor('guest_phone')}
               />
             </div>
