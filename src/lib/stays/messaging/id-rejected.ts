@@ -21,17 +21,27 @@ export function idRejectedText(args: { firstName: string; guestName: string; rea
   )
 }
 
+export type IdRejectedResult = { status: 'sent' } | { status: 'not_sent'; reason: string }
+
 export async function sendIdRejectedMessage(
   db: SupabaseClient,
   args: { accountId: string; stayId: string; guestId: string; reason: string; requestUrl: string; transport?: StayTransport },
 ): Promise<'sent' | 'not_sent'> {
+  return (await sendIdRejectedDetailed(db, args)).status
+}
+
+/** Same send, but says why it did not go out. `notify: false` for a manual resend (staff are looking at it). */
+export async function sendIdRejectedDetailed(
+  db: SupabaseClient,
+  args: { accountId: string; stayId: string; guestId: string; reason: string; requestUrl: string; transport?: StayTransport; notify?: boolean },
+): Promise<IdRejectedResult> {
   const { data: stay } = await db
     .from('stays')
     .select('id, stay_ref, guest_name, guest_phone, form_token, property_id')
     .eq('id', args.stayId)
     .eq('account_id', args.accountId)
     .maybeSingle()
-  if (!stay?.guest_phone) return 'not_sent'
+  if (!stay?.guest_phone) return { status: 'not_sent', reason: 'no_mobile' }
 
   const { data: guest } = await db.from('stay_guests').select('full_name').eq('id', args.guestId).maybeSingle()
   const { data: prop } = await db.from('properties').select('name').eq('id', stay.property_id).maybeSingle()
@@ -54,7 +64,9 @@ export async function sendIdRejectedMessage(
     enforceWindow: false,
     transport: args.transport,
   })
-  if (result.outcome === 'sent') return 'sent'
+  if (result.outcome === 'sent') return { status: 'sent' }
+  const why = result.outcome === 'blocked' ? result.reason : result.outcome === 'failed' ? result.reason : 'not_connected_or_paused'
+  if (args.notify === false) return { status: 'not_sent', reason: why }
 
   await notifyStaff(
     db,
@@ -63,5 +75,5 @@ export async function sendIdRejectedMessage(
     'The WhatsApp message to the guest could not be sent. Please message the guest and ask them to upload the ID again.',
     { includeCaretakers: true },
   ).catch(() => undefined)
-  return 'not_sent'
+  return { status: 'not_sent', reason: why }
 }

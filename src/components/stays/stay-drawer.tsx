@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { Check, Copy, ExternalLink, Eye, Loader2, Pencil, X } from 'lucide-react'
+import { Check, Copy, ExternalLink, Eye, Loader2, Pencil, Send, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -72,6 +72,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
   const [openingDoc, setOpeningDoc] = useState<string | null>(null)
   const [rejectFor, setRejectFor] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [resending, setResending] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!stayId) return
@@ -170,6 +171,31 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
       return false
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function resend(body: { messageKey: string } | { guestId: string }, id: string) {
+    if (!stayId) return
+    setResending(id)
+    try {
+      const res = await fetch(`/api/stays/${stayId}/resend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.ok) {
+        toast.success(t('toast.resent'))
+        await load()
+        onChanged()
+      } else {
+        const why = json.reason ? `: ${String(json.reason).replace(/_/g, ' ')}` : ''
+        toast.error(`${t(`resendErrors.${json.error ?? 'not_sent'}`)}${why}`)
+      }
+    } catch {
+      toast.error(t('toast.saveFailed'))
+    } finally {
+      setResending(null)
     }
   }
 
@@ -407,6 +433,18 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                                     </div>
                                   )
                                 )}
+                                {g.id_rejected_at && stay.guest_phone && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={resending === `id:${g.id}`}
+                                    onClick={() => void resend({ guestId: g.id }, `id:${g.id}`)}
+                                  >
+                                    {resending === `id:${g.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                                    {t('drawer.resendRejected')}
+                                  </Button>
+                                )}
                                 {canUpload && (
                                   <StaffIdUpload
                                     stayId={stay.id}
@@ -448,7 +486,21 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                               {m.last_error && m.status !== 'sent' ? ` · ${m.last_error.replace(/_/g, ' ')}` : ''}
                             </p>
                           </div>
-                          <span className="shrink-0 text-xs text-muted-foreground">{t(`messageStatus.${m.status}`)}</span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{t(`messageStatus.${m.status}`)}</span>
+                            {canIds && !['id_alert_staff', 'owner_alert'].includes(m.message_key) && m.status !== 'sending' && m.status !== 'cancelled' && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={resending === m.message_key}
+                                onClick={() => void resend({ messageKey: m.message_key }, m.message_key)}
+                              >
+                                {resending === m.message_key ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                                {m.status === 'sent' ? t('drawer.resend') : t('drawer.sendNow')}
+                              </Button>
+                            )}
+                          </div>
                         </li>
                       ))}
                     </ul>

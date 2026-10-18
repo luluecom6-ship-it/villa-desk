@@ -2891,7 +2891,10 @@
         "unsupported": "This file type is not supported."
       },
       "messages": "WhatsApp messages",
-      "messagesNone": "No messages scheduled yet. They are queued once the stay has a mobile number."
+      "messagesNone": "No messages scheduled yet. They are queued once the stay has a mobile number.",
+      "resend": "Resend",
+      "sendNow": "Send now",
+      "resendRejected": "Resend ID message to guest"
     },
     "cancel": {
       "title": "Cancel this stay?",
@@ -2912,7 +2915,8 @@
       "idVerified": "ID verified",
       "idRejected": "ID rejected, guest can resubmit",
       "uploadFailed": "Could not upload the ID file",
-      "idUploaded": "ID file saved. It needs review again."
+      "idUploaded": "ID file saved. It needs review again.",
+      "resent": "Message sent to the guest again."
     },
     "errors": {
       "invalidJson": "Invalid request body",
@@ -2967,6 +2971,13 @@
       "blocked_not_registered": "Blocked (not registered)",
       "skipped_condition": "Not needed",
       "cancelled": "Cancelled"
+    },
+    "resendErrors": {
+      "not_found": "Stay not found.",
+      "not_allowed": "This message cannot be resent.",
+      "no_mobile": "This stay has no mobile number.",
+      "nothing_to_resend": "There is nothing to resend.",
+      "not_sent": "Could not send. Check the WhatsApp link in Settings"
     }
   },
   "GuestForm": {

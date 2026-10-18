@@ -94,6 +94,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   (cron every minute). Reply = a `messages` row with sender_type 'agent' after the chase opened; automatic
   Evolution sends are stored as 'bot'. Per-person `profiles.alert_phone` + `available`, `properties.escalate_after_minutes`
   (Settings -> Your profile card). Rows are resolved, never deleted; no guest text stored.
+- Resend (caretaker+): POST /api/stays/[id]/resend `{messageKey}` or `{guestId}` (src/lib/stays/messaging/resend.ts) sends a guest message again, ignoring "still needed" conditions but not the allow-list gate; buttons in the stay drawer (message list, rejected ID). Answers why when it cannot send.
 - M3 still to do: property settings screen (address, map, access text, templates editor).
 - Next after M3: M4 deposits, audit log, hardening; M5 checklists and damage report.
 - Open: house rules are not published yet. The editor on /stays is pre-filled with the 13 rules from
