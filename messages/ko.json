@@ -3196,12 +3196,12 @@
   },
   "GuestAlerts": {
     "title": "Guest messages",
-    "intro": "When a guest writes and needs a person, the first available caretaker is told. If nobody replies in time it moves to the next caretaker, then to the owner.",
+    "intro": "When a guest writes and needs a person, their message is sent to the first available caretaker's own WhatsApp. They swipe-reply there and the answer goes to the guest from the villa number. If nobody replies in time it moves to the next caretaker, then to the owner.",
     "available": "I am on duty and can take guest messages",
-    "phone": "WhatsApp number for alerts",
-    "phoneHint": "Digits with country code. The alert comes from the villa number. Leave empty to get the bell in the app only.",
+    "phone": "Your WhatsApp number",
+    "phoneHint": "Digits with country code (e.g. 966572657189). Guest messages arrive on this WhatsApp from the villa number; reply to one and your answer goes to the guest. Send /help there for commands. Leave empty to get the bell in the app only.",
     "minutes": "Move to the next person after (minutes)",
-    "minutesHint": "Applies to everyone. A reply from the inbox or from the villa phone stops the clock.",
+    "minutesHint": "Applies to everyone. A reply from your WhatsApp, the inbox or the villa phone stops the clock.",
     "save": "Save",
     "saved": "Saved.",
     "failed": "Could not save. Please try again."

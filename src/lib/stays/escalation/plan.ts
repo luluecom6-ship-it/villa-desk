@@ -10,6 +10,8 @@ export interface Responder {
   available: boolean
   alertPhone: string | null
   createdAt: string
+  /** Display name (profiles.full_name); used by /transfer. */
+  name?: string | null
 }
 
 export function buildChain(members: Responder[]): Responder[] {

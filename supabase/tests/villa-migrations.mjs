@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -466,6 +466,18 @@ await rejects('review history is never edited', `UPDATE stay_id_reviews SET reas
 await rejects('review history is never deleted', `DELETE FROM stay_id_reviews`, /cannot be deleted/);
 ok('caretaker can read the review history', (await count(agent, 'stay_id_reviews')) === 2);
 ok('viewer cannot read the review history', (await count(viewer, 'stay_id_reviews')) === 0);
+
+// ---- Migration 060: agent WhatsApp relay ------------------------------------------
+const convA = (await one(`INSERT INTO conversations(account_id) VALUES ('${acct}') RETURNING id, relay_code`));
+const convB = (await one(`INSERT INTO conversations(account_id) VALUES ('${acct}') RETURNING id, relay_code`));
+ok('every conversation gets its own short code', convA.relay_code != null && convB.relay_code != null && convA.relay_code !== convB.relay_code);
+await rejects('a short code is unique', `UPDATE conversations SET relay_code=${convA.relay_code} WHERE id='${convB.id}'`, /unique|duplicate/i);
+await db.exec(`INSERT INTO relay_forwards(account_id, conversation_id, user_id, forward_message_id, source_message_id) VALUES ('${acct}','${convA.id}','${acct}','FWD1','SRC1')`);
+await rejects('a guest message is forwarded to the same agent once', `INSERT INTO relay_forwards(account_id, conversation_id, user_id, source_message_id) VALUES ('${acct}','${convA.id}','${acct}','SRC1')`, /unique|duplicate/i);
+await rejects('forward records are never edited', `UPDATE relay_forwards SET forward_message_id='x'`, /immutable/);
+await rejects('forward records are never deleted', `DELETE FROM relay_forwards`, /cannot be deleted/);
+ok('caretaker can read forwards', (await count(agent, 'relay_forwards')) === 1);
+ok('viewer cannot read forwards', (await count(viewer, 'relay_forwards')) === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

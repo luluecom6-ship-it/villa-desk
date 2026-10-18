@@ -64,3 +64,19 @@ owner. Chasing is done by the scheduler, so **call the cron every minute** (not 
 accurate when nobody has the app open. A free external pinger such as cron-job.org is enough.
 
 > Update 18 Oct 2026: the 09:00 to 20:00 window is removed. Every scheduled message goes out as soon as it is due, at any hour. The WhatsApp number's daily limit (warm-up) still applies.
+
+## Answering guests from your own WhatsApp (migration 060)
+
+Same idea as the Jwacrm agent relay. A guest's message is copied, with the guest's name, stay and a chat
+number (#482), to the first available caretaker's **own WhatsApp** (Settings -> Your profile -> "Your
+WhatsApp number"). The caretaker swipe-replies, and the answer goes to the guest from the villa number and is
+saved in the inbox as an agent message (which stops the clock).
+
+* Swipe-reply, or start with the number (`#482 on my way`), or just type if there is only one open chat.
+* `/close` finish, `/transfer Sara`, `/info`, `/list`, `/off` and `/on` (duty), `/help`.
+* A reply that cannot be matched to a guest is not sent; the agent is asked which chat it is.
+* Not answered in time (default 10 min) -> the next caretaker gets the waiting messages and the first is told,
+  then the owner. The caretaker who answered a guest last time gets that guest's next message first.
+* Only text can be sent back for now (photos and voice notes from the agent are refused with a note).
+* A team member's number is never a guest chat. Do not test by writing to the villa number from your own
+  team number: it will be read as an answer, not a guest message. Use another phone.

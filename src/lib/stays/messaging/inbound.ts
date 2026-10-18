@@ -54,6 +54,8 @@ export async function handleStayInbound(
     /** The guest's conversation. With it, a message that needs a person is chased (agent, next agent, owner). */
     conversationId?: string
     guestName?: string | null
+    /** The guest's WhatsApp message id (so it is forwarded to the agent once). */
+    messageId?: string
     now?: Date
     transport?: StayTransport
   },
@@ -73,6 +75,7 @@ export async function handleStayInbound(
           stayId: null,
           label: args.guestName ? args.guestName.split(/\s+/)[0] : 'an unknown number',
           preview: args.text,
+          messageId: args.messageId,
           siteUrl: siteUrlOf(args.requestUrl),
           now,
         }).catch((e) => console.error('[escalation] open failed:', (e as { code?: string })?.code ?? 'error'))
@@ -151,6 +154,7 @@ export async function handleStayInbound(
       stayId: stay.id,
       label: who,
       preview: args.text,
+      messageId: args.messageId,
       siteUrl: siteUrlOf(args.requestUrl),
       now,
     })

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { handleStayInbound } from '@/lib/stays/messaging/inbound'
 import { logStayMessage } from '@/lib/stays/messaging/send'
+import { findRelayAgent, onAgentMessage } from '@/lib/stays/relay/server'
 import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation'
 import { normalizeUpdates, normalizeUpsert, type NormalizedMessage } from './normalize'
 
@@ -68,6 +69,7 @@ async function receiveGuestMessage(ctx: ReceiveContext, n: NormalizedMessage): P
       requestUrl: ctx.requestUrl,
       conversationId: conv.conversationId,
       guestName: n.pushName,
+      messageId: n.id,
       // Replies to a guest go back out on this same channel.
     })
     return r.handled ? 'stay_command' : r.registered ? 'registered_other' : r.suppressAutomation ? 'unregistered_silenced' : 'received'
@@ -94,6 +96,16 @@ async function recordPhoneMessage(ctx: ReceiveContext, n: NormalizedMessage): Pr
   return 'phone_message_stored'
 }
 
+async function relayAgentMessage(ctx: ReceiveContext, agent: NonNullable<Awaited<ReturnType<typeof findRelayAgent>>>, n: NormalizedMessage): Promise<string> {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '') || (() => { try { return new URL(ctx.requestUrl).origin } catch { return '' } })()
+  return onAgentMessage(ctx.db, {
+    accountId: ctx.accountId,
+    agent,
+    siteUrl,
+    msg: { id: n.id, text: n.text, quotedId: n.quotedId, hasMedia: !!n.media || ['image', 'video', 'document', 'audio', 'sticker'].includes(n.type) },
+  })
+}
+
 export async function receiveUpsert(data: unknown, ctx: ReceiveContext): Promise<string> {
   const items = Array.isArray(data) ? data : [data]
   const outcomes: string[] = []
@@ -108,6 +120,13 @@ export async function receiveUpsert(data: unknown, ctx: ReceiveContext): Promise
       continue
     }
     try {
+      // Team members' numbers are never guest chats. Their messages to the villa number are
+      // answers for a guest; what the villa number sent to them (the echo) is ignored.
+      const agent = await findRelayAgent(ctx.db, ctx.accountId, n.phone)
+      if (agent) {
+        outcomes.push(n.fromMe ? 'staff_echo_ignored' : n.type === 'reaction' ? 'agent_reaction_ignored' : await relayAgentMessage(ctx, agent, n))
+        continue
+      }
       outcomes.push(n.fromMe ? await recordPhoneMessage(ctx, n) : await receiveGuestMessage(ctx, n))
     } catch (e) {
       console.error('[evolution] inbound failed:', (e as { code?: string })?.code ?? 'error')
