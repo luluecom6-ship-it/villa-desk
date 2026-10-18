@@ -71,10 +71,19 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   WhatsApp webhook; villa mode (`properties.villa_mode`) keeps flows, automations and the AI bot away
   from unregistered numbers (inbound in the webhook, outbound via `assertVillaSendAllowed`).
   Staff alerts use `notifications` type `stay_alert`. Stay drawer shows each stay's message queue.
-- M3 still to do: port Evolution (needs the Jwacrm repo attached): client, webhook, QR + pairing-code
-  mobile link screen, safety.ts with the IST window setting, channel routing via `conversations.channel`
-  (column added in 055). A property settings screen (address, map, access text, templates editor).
-  Until then all stay messages go out on Meta and `properties.default_channel` is ignored.
+- M3 part 2 (done, needs migration 056): **Evolution is the working channel, Meta is parked** (code kept,
+  `properties.default_channel` chooses; a guest's own channel `conversations.channel` wins for replies).
+  Env vars `EVOLUTION_BASE_URL` + `EVOLUTION_API_KEY`; per-account instance token encrypted in
+  `evolution_config` (service role only). `src/lib/evolution/`: client (QR + pairing code), safety (pure:
+  warm-up 20/40/70/100 then max, hours in the property time zone, 4-of-5 auto-pause, 401/403 pause),
+  safety-server, transport (`evolutionStayTransport`, `sendStaffViaEvolution`), receive (inbound -> inbox +
+  `handleStayInbound`), normalize. A transport throws `StayWaitError` to keep a message queued without using
+  an attempt. API `/api/evolution/{connect,status,test,logout,pause,settings}` (admin) and
+  `/api/evolution/webhook/<secret>`. UI: Settings -> WhatsApp link (mobile-first), banner on /stays.
+  `sendMessageToConversation` sends staff inbox messages on Evolution for evolution chats. Logs
+  (`evolution_send_log`, `evolution_event_log`) are append-only, last 4 digits only. Docs: docs/villa-evolution.md.
+  Not on this channel: flows, automations, AI bot, inbound media storage, templates (plain text only).
+- M3 still to do: property settings screen (address, map, access text, templates editor).
 - Next after M3: M4 deposits, audit log, hardening; M5 checklists and damage report.
 - Open: house rules are not published yet. The editor on /stays is pre-filled with the 13 rules from
   Form 2 of the Forms Pack (src/lib/stays/default-house-rules.ts); an admin reviews and presses Publish.

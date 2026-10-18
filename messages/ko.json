@@ -3108,5 +3108,65 @@
       "acceptRules": "Please accept the house rules.",
       "signatureRequired": "Type your full name to sign."
     }
+  },
+  "WhatsAppLink": {
+    "title": "WhatsApp link",
+    "intro": "Link the villa's WhatsApp number once. Guest messages are sent from this number.",
+    "adminOnly": "Only an admin can link the WhatsApp number.",
+    "failed": "Something went wrong. Please try again.",
+    "loadError": "Could not load the link state.",
+    "serverNotReady": "The Evolution server is not set up on this deployment (EVOLUTION_BASE_URL and EVOLUTION_API_KEY).",
+    "status": {
+      "not_linked": "Not linked",
+      "waiting": "Waiting for scan",
+      "connected": "Connected",
+      "paused": "Paused",
+      "logged_out": "Logged out"
+    },
+    "reason": {
+      "paused_by_admin": "Paused by an admin.",
+      "too_many_failures": "Paused automatically after repeated failures.",
+      "logged_out": "The number was logged out from the phone.",
+      "refused_by_whatsapp": "WhatsApp refused the connection. Check the number before resuming.",
+      "other": "Paused."
+    },
+    "usage": "Guest messages sent today: {sent} of {limit}.",
+    "tabQr": "Scan QR",
+    "tabCode": "Use pairing code",
+    "qrStep1": "On the villa phone open WhatsApp.",
+    "qrStep2": "Tap Settings, then Linked devices, then Link a device.",
+    "qrStep3": "Scan the code below.",
+    "qrAlt": "QR code to link WhatsApp",
+    "showQr": "Show QR code",
+    "newQr": "Get a new QR code",
+    "codeIntro": "Type the villa's phone number, get an 8-character code, then enter it in WhatsApp.",
+    "phoneLabel": "Phone number with country code",
+    "getCode": "Get pairing code",
+    "codeLabel": "Pairing code",
+    "codeSteps": "In WhatsApp tap Linked devices, Link a device, then Link with phone number instead. Enter this code.",
+    "sendTest": "Send test message to this number",
+    "testSent": "Test message sent.",
+    "pause": "Pause sending",
+    "resume": "Resume sending",
+    "resumed": "Sending resumed.",
+    "safetyTitle": "Safety limits",
+    "safetyIntro": "A new number starts at 20 messages a day and grows over three weeks, up to your maximum. This protects it from being blocked.",
+    "maxDaily": "Maximum messages per day",
+    "startHour": "Send from (hour)",
+    "endHour": "Send until (hour)",
+    "timeZone": "Hours use the property time zone: {zone}.",
+    "autoPause": "Pause automatically if sending keeps failing",
+    "save": "Save",
+    "saved": "Saved.",
+    "logout": "Log out this number",
+    "logoutConfirm": "Log out the WhatsApp number? Guest messages will wait until you link it again.",
+    "loggedOut": "Logged out.",
+    "relinkHint": "Scan again to link the number. Queued messages are kept.",
+    "banner": {
+      "paused": "Guest messages are paused: the WhatsApp number is paused. They stay queued.",
+      "logged_out": "Guest messages are waiting: the WhatsApp number was logged out. Link it again.",
+      "not_linked": "The villa WhatsApp number is not linked yet, so no guest messages can go out.",
+      "open": "Open WhatsApp link"
+    }
   }
 }

@@ -26,6 +26,7 @@ import {
 } from '@/components/stays/stay-badges'
 import { StayDrawer, type DrawerStay } from '@/components/stays/stay-drawer'
 import { StayFormDialog } from '@/components/stays/stay-form-dialog'
+import { WhatsAppBanner } from '@/components/settings/whatsapp-banner'
 import { HouseRulesPanel } from '@/components/stays/house-rules'
 
 type ListStay = DrawerStay
@@ -98,6 +99,7 @@ export default function StaysPage() {
         )}
       </div>
 
+      {isAdmin && <WhatsAppBanner />}
       <HouseRulesPanel isAdmin={isAdmin} />
 
       <div className="space-y-3">

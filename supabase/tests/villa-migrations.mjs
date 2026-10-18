@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -415,6 +415,20 @@ ok('notifications accept the stay_alert type', true);
 await db.exec(`INSERT INTO conversations(account_id) VALUES ('${acct}')`);
 await db.exec(`UPDATE conversations SET channel='meta'`);
 await rejects('conversation channel is meta, evolution or empty', `UPDATE conversations SET channel='sms'`, /check/i);
+
+// ---- Migration 056: Evolution channel ----------------------------------------
+await db.exec(`INSERT INTO evolution_config(account_id, instance_name, api_key, webhook_secret) VALUES ('${acct}','villa','enc','${'a'.repeat(48)}')`);
+const evo = await one(`SELECT max_daily, window_start_hour, window_end_hour, auto_pause, state FROM evolution_config`);
+ok('evolution defaults: 100/day, 09:00 to 20:00, auto-pause on', evo.max_daily === 100 && evo.window_start_hour === 9 && evo.window_end_hour === 20 && evo.auto_pause === true && evo.state === 'unknown');
+await rejects('evolution window must start before it ends', `UPDATE evolution_config SET window_start_hour=20, window_end_hour=9`, /check/i);
+await rejects('evolution state is a known value', `UPDATE evolution_config SET state='banana'`, /check/i);
+await db.exec(`INSERT INTO evolution_send_log(account_id, ok, kind, phone_tail) VALUES ('${acct}', true, 'scheduled', '7777')`);
+await rejects('send log refuses a full phone number', `INSERT INTO evolution_send_log(account_id, ok, phone_tail) VALUES ('${acct}', true, '919777777777')`, /check/i);
+await rejects('send log rows cannot be edited', `UPDATE evolution_send_log SET ok=false`, /immutable/);
+await rejects('send log rows cannot be deleted', `DELETE FROM evolution_send_log`, /cannot be deleted/);
+await db.exec(`INSERT INTO evolution_event_log(account_id, event, outcome) VALUES ('${acct}','connection.update','open')`);
+await rejects('event log rows cannot be deleted', `DELETE FROM evolution_event_log`, /cannot be deleted/);
+await rejects('event log rows cannot be edited', `UPDATE evolution_event_log SET outcome='x'`, /immutable/);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

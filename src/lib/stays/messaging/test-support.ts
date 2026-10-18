@@ -24,7 +24,7 @@ class Q {
   limit(n: number) { this.limitN = n; return this }
   update(p: Row) { this.mode = 'update'; this.patch = p; return this }
   insert(rows: Row | Row[]) { this.mode = 'insert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this }
-  upsert(rows: Row[], o: { ignoreDuplicates?: boolean }) { this.mode = 'upsert'; this.payload = rows; this.ignoreDup = !!o.ignoreDuplicates; return this }
+  upsert(rows: Row | Row[], o: { ignoreDuplicates?: boolean }) { this.mode = 'upsert'; this.payload = Array.isArray(rows) ? rows : [rows]; this.ignoreDup = !!o.ignoreDuplicates; return this }
   maybeSingle() { return this.run().then((r) => ({ data: r.data?.[0] ?? null, error: r.error })) }
   then(a?: (v: { data: any; error: any }) => unknown, b?: (e: unknown) => unknown) { return this.run().then(a, b) }
   private async run() {
@@ -32,7 +32,7 @@ class Q {
     if (this.mode === 'insert' || this.mode === 'upsert') {
       const made: Row[] = []
       for (const p of this.payload) {
-        if (this.mode === 'upsert' && rows.some((r) => r.stay_id === p.stay_id && r.message_key === p.message_key)) continue
+        if (this.mode === 'upsert' && rows.some((r) => ('message_id' in p ? r.conversation_id === p.conversation_id && r.message_id === p.message_id : r.stay_id === p.stay_id && r.message_key === p.message_key))) continue
         const row = { id: `${this.table}-${++this.db.seq}`, updated_at: new Date(0).toISOString(), attempts: 0, ...p }
         rows.push(row)
         made.push(row)

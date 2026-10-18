@@ -42,7 +42,9 @@ export async function resolveConversationByPhone(
   db: SupabaseClient,
   accountId: string,
   phone: string,
-  name?: string | null
+  name?: string | null,
+  // The Evolution channel has no Meta config. It passes false.
+  opts: { requireMetaConfig?: boolean } = {}
 ): Promise<ResolvedConversation> {
   // Raw integrator input: the leading `+` is required so the country
   // code is explicit — "4155551212" would otherwise be delivered to
@@ -58,11 +60,14 @@ export async function resolveConversationByPhone(
 
   // Fail fast (and create nothing) when the account has no WhatsApp
   // connected — the same error the send would raise anyway.
-  const { data: config } = await db
-    .from('whatsapp_config')
-    .select('id')
-    .eq('account_id', accountId)
-    .maybeSingle();
+  const { data: config } =
+    opts.requireMetaConfig === false
+      ? { data: { id: 'not-needed' } }
+      : await db
+          .from('whatsapp_config')
+          .select('id')
+          .eq('account_id', accountId)
+          .maybeSingle();
   if (!config) {
     throw new SendMessageError(
       'whatsapp_not_configured',

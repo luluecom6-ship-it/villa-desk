@@ -183,6 +183,15 @@ export function validateSendMessageParams(params: {
   }
 }
 
+async function evolutionLinked(accountId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin()
+    .from('evolution_config')
+    .select('account_id')
+    .eq('account_id', accountId)
+    .maybeSingle();
+  return !!data;
+}
+
 export async function sendMessageToConversation(
   db: SupabaseClient,
   accountId: string,
@@ -254,25 +263,30 @@ export async function sendMessageToConversation(
   const hasValidPhone = resolvedTarget.isPhone;
   const sanitizedPhone = hasValidPhone ? sendTarget : '';
 
-  // WhatsApp config, account-scoped.
-  const { data: config, error: configError } = await db
+  // WhatsApp config, account-scoped. A chat on the WhatsApp app number
+  // (Evolution) has no Meta config, so the config is optional here.
+  const { data: configRow } = await db
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', accountId)
     .single();
 
-  if (configError || !config) {
+  const useEvolution =
+    conversation.channel === 'evolution' ||
+    (!conversation.channel && !configRow && (await evolutionLinked(accountId)));
+
+  if (!useEvolution && !configRow) {
     throw new SendMessageError(
       'whatsapp_not_configured',
       'WhatsApp not configured. Please set up your WhatsApp integration first.',
       400
     );
   }
-
-  const accessToken = decrypt(config.access_token);
+  const config = configRow as NonNullable<typeof configRow>;
+  const accessToken = useEvolution ? '' : decrypt(config.access_token);
 
   // Self-heal legacy CBC ciphertexts. Fire-and-forget; idempotent.
-  if (isLegacyFormat(config.access_token)) {
+  if (!useEvolution && isLegacyFormat(config.access_token)) {
     void db
       .from('whatsapp_config')
       .update({ access_token: encrypt(accessToken) })
@@ -405,11 +419,29 @@ export async function sendMessageToConversation(
     return result.messageId;
   };
 
+  let waMessageId = '';
+  let workingPhone = sendTarget;
+  if (useEvolution) {
+    if (!hasValidPhone) {
+      throw new SendMessageError('bad_request', 'The WhatsApp app number can only message a phone number.', 400);
+    }
+    try {
+      const { sendStaffViaEvolution } = await import('@/lib/evolution/transport');
+      waMessageId = await sendStaffViaEvolution(db, accountId, {
+        phone: sanitizedPhone,
+        messageType,
+        text: messageType === 'interactive' ? interactivePayload!.body : (contentText ?? null),
+        mediaUrl: mediaUrl ?? null,
+        filename: filename ?? null,
+      });
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? 'send_error';
+      throw new SendMessageError('evolution_error', `WhatsApp app number: ${code}`, 502);
+    }
+  } else {
   // Send via Meta — retry across phone-number variants if Meta rejects
   // with "recipient not in allowed list"; persist a working variant
   // back to the contact so the next send goes straight through.
-  let waMessageId = '';
-  let workingPhone = sendTarget;
   try {
     // Variants only make sense for a phone number — a BSUID is opaque
     // and has exactly one correct form, so it gets a single attempt.
@@ -440,6 +472,7 @@ export async function sendMessageToConversation(
       err instanceof Error ? err.message : 'Unknown Meta API error';
     console.error('[send-message] Meta send failed for all variants:', message);
     throw new SendMessageError('meta_error', `Meta API error: ${message}`, 502);
+  }
   }
 
   if (hasValidPhone && workingPhone !== sanitizedPhone) {

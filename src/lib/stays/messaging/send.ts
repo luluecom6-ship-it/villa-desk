@@ -23,6 +23,20 @@ export interface StayTransportArgs {
   text: string
   /** Approved Meta template to use instead of free text. */
   template?: { name: string; params: string[] }
+  /** 'scheduled' = we start the conversation; 'reply' = answering a guest who wrote first. */
+  kind?: 'scheduled' | 'reply'
+}
+
+/**
+ * A transport throws this when the message cannot go right now for a reason
+ * that is not a failure (number paused, outside its hours, daily limit,
+ * not connected). The message stays queued and no attempt is used up.
+ */
+export class StayWaitError extends Error {
+  constructor(readonly code: string) {
+    super(`Not sent yet: ${code}`)
+    this.name = 'StayWaitError'
+  }
 }
 
 export type StayTransport = (args: StayTransportArgs) => Promise<{ messageId: string }>
@@ -109,9 +123,10 @@ export async function sendStayWhatsApp(
 
   if (args.enforceWindow && !inSendWindow(now)) return { outcome: 'waiting' }
 
-  const transport = args.transport ?? metaTransport
   try {
-    const { messageId } = await transport({ ...args, db })
+    const transport =
+      args.transport ?? (await (await import('./channel')).defaultStayTransport(db, args.accountId, args.phone))
+    const { messageId } = await transport({ ...args, db, kind: args.enforceWindow ? 'scheduled' : 'reply' })
     await logStayMessage(db, {
       accountId: args.accountId,
       stayId: args.stayId,
@@ -121,6 +136,7 @@ export async function sendStayWhatsApp(
     })
     return { outcome: 'sent', messageId }
   } catch (err) {
+    if (err instanceof StayWaitError) return { outcome: 'waiting' }
     const reason = safeReason(err)
     await logStayMessage(db, {
       accountId: args.accountId,
@@ -136,9 +152,9 @@ export async function sendStayWhatsApp(
 
 /**
  * Meta Cloud API transport, through the app's existing send core so contacts,
- * conversations and the inbox stay consistent. Which channel a property uses
- * is `properties.default_channel`; until Evolution is ported every stay
- * message goes out on Meta.
+ * conversations and the inbox stay consistent. Which channel a stay message
+ * uses is decided in ./channel (the guest's last channel, else
+ * `properties.default_channel`).
  */
 export const metaTransport: StayTransport = async ({ db, accountId, phone, guestName, text, template }) => {
   // Imported here so the pure parts of this module stay cheap to test.
