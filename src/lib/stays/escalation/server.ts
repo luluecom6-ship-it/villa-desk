@@ -56,7 +56,7 @@ export async function alertResponder(
   accountId: string,
   to: Responder,
   info: { label: string; preview: string; siteUrl: string; escalated: boolean; conversationId?: string; items?: RelayItem[]; movedFrom?: string | null },
-): Promise<void> {
+): Promise<'sent' | 'no_number' | 'not_sent'> {
   const title = `${info.escalated ? 'Not answered yet: ' : ''}Guest message: ${info.label}`
   await db
     .from('notifications')
@@ -65,19 +65,21 @@ export async function alertResponder(
       if (error) console.error('[escalation] bell failed:', error.code)
     })
 
-  if (!to.alertPhone || !info.conversationId) return
+  if (!to.alertPhone || !info.conversationId) return 'no_number'
   try {
     const items = info.items && info.items.length > 0 ? info.items : [{ messageId: `alert-${info.conversationId}-${Date.now()}`, text: info.preview }]
     const sent = await forwardToResponder(db, { accountId, conversationId: info.conversationId, to, items, intro: true, movedFrom: info.movedFrom })
     if (sent === 0 && !info.items) await tell(db, accountId, to.alertPhone, `Guest message from ${info.label}. Please reply in the app: ${info.siteUrl}/inbox`)
+    return sent > 0 ? 'sent' : 'not_sent'
   } catch (e) {
     console.error('[escalation] whatsapp forward failed:', (e as { status?: number })?.status ?? 'error')
+    return 'not_sent'
   }
 }
 
 export async function openEscalation(
   db: SupabaseClient,
-  args: { accountId: string; conversationId: string; stayId: string | null; label: string; preview: string; siteUrl: string; messageId?: string; mediaUrl?: string | null; mediaType?: string | null; now?: Date },
+  args: { accountId: string; conversationId: string; stayId: string | null; label: string; preview: string; siteUrl: string; messageId?: string; mediaUrl?: string | null; mediaType?: string | null; now?: Date; /** One-word note on what happened to the WhatsApp copy (shown in the event log). */ report?: (detail: string) => void },
 ): Promise<'opened' | 'already_open' | 'nobody'> {
   const now = args.now ?? new Date()
   const { data: open } = await db
@@ -87,25 +89,42 @@ export async function openEscalation(
     .eq('status', 'open')
     .limit(1)
   const item: RelayItem = { messageId: args.messageId ?? `msg-${args.conversationId}-${now.getTime()}`, text: args.preview || null, mediaUrl: args.mediaUrl ?? null, mediaType: args.mediaType ?? null }
+  const everyone = await loadResponders(db, args.accountId)
+  const chain = buildChain(everyone)
+  const withNumber = (list: Responder[]) => list.find((m) => !!m.alertPhone)
   if (open && open.length > 0) {
-    // Another message while someone has the chat: it follows to the same person.
-    const current = (open[0].notified_user_ids ?? []).at(-1)
-    const who = (await loadResponders(db, args.accountId)).find((p) => p.userId === current)
-    if (who?.alertPhone) {
-      await forwardToResponder(db, { accountId: args.accountId, conversationId: args.conversationId, to: who, items: [item], intro: false }).catch(() => 0)
+    // Another message while someone has the chat: it follows to the same person, once.
+    const told: string[] = open[0].notified_user_ids ?? []
+    const current = everyone.find((p) => p.userId === told.at(-1))
+    if (current?.alertPhone) {
+      const sent = await forwardToResponder(db, { accountId: args.accountId, conversationId: args.conversationId, to: current, items: [item], intro: false }).catch(() => 0)
+      args.report?.(`follow:${sent > 0 ? 'sent' : 'skipped_or_failed'}`)
+      return 'already_open'
+    }
+    // The person holding the chat has no WhatsApp number (or left): hand it to the first one who has,
+    // otherwise the message would only ever reach a bell.
+    const other = withNumber(chain.filter((m) => m.userId !== current?.userId))
+    if (other) {
+      await db.from('conversation_escalations').update({ notified_user_ids: [...told, other.userId], last_notified_at: now.toISOString() }).eq('id', open[0].id).eq('status', 'open')
+      const backlog = await unansweredGuestMessages(db, args.conversationId, new Date(now.getTime() - 24 * 3_600_000).toISOString()).catch(() => [] as RelayItem[])
+      const items = backlog.some((b) => b.messageId === item.messageId) ? backlog : [...backlog, item]
+      const sent = await forwardToResponder(db, { accountId: args.accountId, conversationId: args.conversationId, to: other, items, intro: true }).catch(() => 0)
+      args.report?.(`rerouted:${sent > 0 ? 'sent' : 'failed'}`)
+    } else {
+      args.report?.('no_number_set')
     }
     return 'already_open'
   }
 
-  const everyone = await loadResponders(db, args.accountId)
-  const chain = buildChain(everyone)
   // The person who answered this guest last time gets the chat again, if on duty.
   const { data: past } = await db.from('relay_forwards').select('user_id, created_at').eq('conversation_id', args.conversationId)
   const lastUser = [...(past ?? [])].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))[0]?.user_id
   const previous = chain.find((m) => m.userId === lastUser)
-  const first = previous ?? nextResponder(chain, [])
+  // Someone who can actually receive it on WhatsApp comes first; a bell alone is the fallback.
+  const first = previous ?? withNumber(chain) ?? nextResponder(chain, [])
   if (!first) {
     console.error('[escalation] nobody to tell: no team member is on duty')
+    args.report?.('nobody_on_duty')
     return 'nobody'
   }
 
@@ -126,7 +145,8 @@ export async function openEscalation(
     return 'already_open'
   }
   if (!first.alertPhone) console.error('[escalation] first responder has no WhatsApp number set; bell only')
-  await alertResponder(db, args.accountId, first, { label: args.label, preview: args.preview, siteUrl: args.siteUrl, escalated: false, conversationId: args.conversationId, items: [item] })
+  const delivered = await alertResponder(db, args.accountId, first, { label: args.label, preview: args.preview, siteUrl: args.siteUrl, escalated: false, conversationId: args.conversationId, items: [item] })
+  args.report?.(`opened:${delivered}`)
   return 'opened'
 }
 

@@ -204,3 +204,23 @@ describe('forwarding', () => {
     expect(n).toBe(0)
   })
 })
+
+describe('an open chase held by someone without a WhatsApp number', () => {
+  it('a new guest message is handed to the first person who has one, and the result is reported', async () => {
+    db.tables.profiles[1].alert_phone = null // Ravi has no number
+    db.tables.conversation_escalations = [{ id: 'e1', account_id: 'a', conversation_id: 'c1', status: 'open', notified_user_ids: ['care1'], opened_at: T0.toISOString(), due_at: new Date(T0.getTime() + 600000).toISOString() }]
+    db.tables.messages = [{ id: 'm1', conversation_id: 'c1', sender_type: 'customer', message_id: 'G1', content_text: 'Hello?', created_at: T0.toISOString() }]
+    const seen: string[] = []
+    await openEscalation(db, { accountId: 'a', conversationId: 'c1', stayId: 's1', label: 'Asha', preview: 'Hello?', messageId: 'G1', siteUrl: '', now: T0, report: (d) => seen.push(d) })
+    expect(seen).toEqual(['rerouted:sent'])
+    expect(sentTo('966500000003')).toHaveLength(1) // Sara, the next agent with a number
+  })
+
+  it('a new chase skips agents with no number and says when nobody has one', async () => {
+    db.tables.profiles.forEach((p: any) => { p.alert_phone = null })
+    const seen: string[] = []
+    await openEscalation(db, { accountId: 'a', conversationId: 'c1', stayId: 's1', label: 'Asha', preview: 'Hi', messageId: 'G9', siteUrl: '', now: T0, report: (d) => seen.push(d) })
+    expect(seen).toEqual(['opened:no_number'])
+    expect(m.sendText).not.toHaveBeenCalled()
+  })
+})

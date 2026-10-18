@@ -86,7 +86,8 @@ async function receiveGuestMessage(ctx: ReceiveContext, n: NormalizedMessage): P
       mediaType: media.mime,
       // Replies to a guest go back out on this same channel.
     })
-    return r.handled ? 'stay_command' : r.registered ? 'registered_other' : r.suppressAutomation ? 'unregistered_silenced' : 'received'
+    const base = r.handled ? 'stay_command' : r.registered ? 'registered_other' : r.suppressAutomation ? 'unregistered_silenced' : 'received'
+    return r.escalation ? `${base} ${r.escalation}` : base
   } catch (e) {
     console.error('[evolution] stay inbound failed:', (e as { code?: string })?.code ?? 'error')
     return 'stay_logic_error'

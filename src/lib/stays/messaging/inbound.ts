@@ -41,6 +41,8 @@ export interface StayInboundResult {
   handled: boolean
   /** Villa mode is on and the number is NOT registered: block upstream bots. */
   suppressAutomation: boolean
+  /** What happened to the copy for the agent's WhatsApp (event log): opened:sent, opened:no_number, follow:sent, no_number_set ... */
+  escalation?: string
 }
 
 export async function handleStayInbound(
@@ -64,6 +66,8 @@ export async function handleStayInbound(
   },
 ): Promise<StayInboundResult> {
   const now = args.now ?? new Date()
+  let escalation: string | undefined
+  const report = (d: string) => { escalation = d }
   const stay = args.phone ? await findAutomationStay(db, args.accountId, args.phone, now) : null
 
   if (!stay) {
@@ -84,6 +88,7 @@ export async function handleStayInbound(
           mediaType: args.mediaType,
           siteUrl: siteUrlOf(args.requestUrl),
           now,
+          report,
         }).catch((e) => console.error('[escalation] open failed:', (e as { code?: string })?.code ?? 'error'))
       }
       if (suppress) {
@@ -98,7 +103,7 @@ export async function handleStayInbound(
         })
       }
     }
-    return { registered: false, handled: false, suppressAutomation: suppress }
+    return { registered: false, handled: false, suppressAutomation: suppress, escalation }
   }
 
   const { data: full } = await db
@@ -167,10 +172,11 @@ export async function handleStayInbound(
       mediaType: args.mediaType,
       siteUrl: siteUrlOf(args.requestUrl),
       now,
+      report,
     })
   } else {
     await notifyStaff(db, args.accountId, `Guest message: ${who}`, 'Open the inbox to read and reply.', { includeCaretakers: true })
   }
   await logStayMessage(db, { accountId: args.accountId, stayId: stay.id, messageKey: 'inbound_other', direction: 'in', outcome: 'inbound_handled', phone: args.phone })
-  return { registered: true, handled: false, suppressAutomation: false }
+  return { registered: true, handled: false, suppressAutomation: false, escalation }
 }
