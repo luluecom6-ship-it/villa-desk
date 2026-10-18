@@ -48,6 +48,16 @@ export async function POST(request: Request) {
       if (!row) throw new Error('config missing')
       const conn = connFromRow(row)
 
+      // The Evolution server may have lost our instance (server rebuilt, instance deleted, number
+      // changed on a fresh server). We still hold its token: create it again under the same name.
+      const adminConn = { baseUrl: server.baseUrl, instance: conn.instance, apiKey: server.globalKey }
+      if (!(await fetchInstance(adminConn).catch(() => 'unknown' as const))) {
+        await createInstance(adminConn, conn.apiKey)
+        await db.from('evolution_config').update({ state: 'unknown', qr_code: null, pairing_code: null, connected_number: null }).eq('account_id', ctx.accountId)
+        row = { ...row, state: 'unknown' }
+        await logEvolutionEvent(ctx.accountId, 'connect', 'instance_recreated', db)
+      }
+
       await setWebhook(conn, webhookUrl(request, row.webhook_secret))
       const state = await connectionState(conn)
       let qr: string | null = null
