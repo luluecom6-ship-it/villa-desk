@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { findAutomationStay } from '../automation'
 import { allAdultIdsVerified } from './conditions'
 import { notifyStaff } from './notify'
+import { openEscalation } from '../escalation/server'
 import { logStayMessage, sendStayWhatsApp, type StayTransport } from './send'
 import { DEFAULT_TEMPLATES, firstName, renderTemplate } from './templates'
 import { buildValues } from './scheduler'
@@ -15,6 +16,16 @@ import { villaModeOn } from './villa-mode'
 //   anything else  alert the team; no automatic answer from the stay logic
 
 export type StayInboundCommand = 'ready' | 'access' | 'other'
+
+function siteUrlOf(requestUrl: string): string {
+  const env = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
+  if (env) return env
+  try {
+    return new URL(requestUrl).origin
+  } catch {
+    return ''
+  }
+}
 
 export function parseInboundCommand(text: string): StayInboundCommand {
   const t = (text ?? '').trim().toLowerCase().replace(/[.!\s]+$/g, '')
@@ -40,6 +51,9 @@ export async function handleStayInbound(
     phone: string | null
     text: string
     requestUrl: string
+    /** The guest's conversation. With it, a message that needs a person is chased (agent, next agent, owner). */
+    conversationId?: string
+    guestName?: string | null
     now?: Date
     transport?: StayTransport
   },
@@ -51,6 +65,18 @@ export async function handleStayInbound(
     // Not registered: the stay logic does nothing and sends nothing.
     const suppress = await villaModeOn(db, args.accountId)
     if (suppress) {
+      // Staff still see it: an unknown number writing to the villa is chased like any guest message.
+      if (args.conversationId) {
+        await openEscalation(db, {
+          accountId: args.accountId,
+          conversationId: args.conversationId,
+          stayId: null,
+          label: args.guestName ? args.guestName.split(/\s+/)[0] : 'an unknown number',
+          preview: args.text,
+          siteUrl: siteUrlOf(args.requestUrl),
+          now,
+        }).catch((e) => console.error('[escalation] open failed:', (e as { code?: string })?.code ?? 'error'))
+      }
       await logStayMessage(db, {
         accountId: args.accountId,
         stayId: null,
@@ -117,7 +143,20 @@ export async function handleStayInbound(
 
   // Help, or anything else: a person should read it. The conversation already
   // exists in the inbox; the team gets an alert and no automatic answer is sent.
-  await notifyStaff(db, args.accountId, `Guest message: ${who}`, 'Open the inbox to read and reply.', { includeCaretakers: true })
+  // The agent is told first; if nobody replies it moves to the next agent, then the owner.
+  if (args.conversationId) {
+    await openEscalation(db, {
+      accountId: args.accountId,
+      conversationId: args.conversationId,
+      stayId: stay.id,
+      label: who,
+      preview: args.text,
+      siteUrl: siteUrlOf(args.requestUrl),
+      now,
+    })
+  } else {
+    await notifyStaff(db, args.accountId, `Guest message: ${who}`, 'Open the inbox to read and reply.', { includeCaretakers: true })
+  }
   await logStayMessage(db, { accountId: args.accountId, stayId: stay.id, messageKey: 'inbound_other', direction: 'in', outcome: 'inbound_handled', phone: args.phone })
   return { registered: true, handled: false, suppressAutomation: false }
 }

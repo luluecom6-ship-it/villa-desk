@@ -23,8 +23,12 @@ export interface StayTransportArgs {
   text: string
   /** Approved Meta template to use instead of free text. */
   template?: { name: string; params: string[] }
-  /** 'scheduled' = we start the conversation; 'reply' = answering a guest who wrote first. */
-  kind?: 'scheduled' | 'reply'
+  /**
+   * 'scheduled' = we start the conversation, inside the sending hours;
+   * 'immediate' = we start it but at once, at any hour (the first form link);
+   * 'reply' = answering a guest who wrote first.
+   */
+  kind?: 'scheduled' | 'immediate' | 'reply'
 }
 
 /**
@@ -126,7 +130,7 @@ export async function sendStayWhatsApp(
   try {
     const transport =
       args.transport ?? (await (await import('./channel')).defaultStayTransport(db, args.accountId, args.phone))
-    const { messageId } = await transport({ ...args, db, kind: args.enforceWindow ? 'scheduled' : 'reply' })
+    const { messageId } = await transport({ ...args, db, kind: args.kind ?? (args.enforceWindow ? 'scheduled' : 'reply') })
     await logStayMessage(db, {
       accountId: args.accountId,
       stayId: args.stayId,

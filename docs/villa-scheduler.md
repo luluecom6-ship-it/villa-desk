@@ -44,11 +44,21 @@ Calling it twice in a row is safe: each message is sent once.
 ## Sends that do not wait for the cron
 
 - **New registration with a mobile number** (or a corrected number): the scheduler runs at once, so the
-  form-link message goes out immediately. Inside the 09:00 to 20:00 IST window only; outside it the message
-  waits until 09:00 (PDR rule).
+  form-link message goes out immediately, at any hour (owner decision: the first form link is exempt from the
+  09:00 to 20:00 window; the WhatsApp number's daily limit still applies). Every other guest message still
+  waits for 09:00.
 - **While staff use the app**, opening the Stays list also runs the scheduler (at most once a minute).
 - **ID rejected:** the guest gets a WhatsApp straight away with the reason and the link to upload again,
   at any hour. If it cannot be sent (number paused or disconnected) staff get a notification to message the
   guest by hand.
 - The external cron above is still needed for the quiet hours and for timed messages (reminders the day
   before, check-out, review) when nobody has the app open.
+
+## Guest messages that need a person (migration 058)
+
+A guest message that is not READY / 1 / 2, and any message from an unregistered number while villa mode is on,
+is chased: the first available caretaker gets a bell in the app and a WhatsApp from the villa number (if they
+set an alert number in Settings -> Your profile). No reply (from the inbox or typed on the villa phone) within
+the wait (default 10 minutes, set by an admin) -> the next available caretaker, and when none is left -> the
+owner. Chasing is done by the scheduler, so **call the cron every minute** (not every 15) for the timing to be
+accurate when nobody has the app open. A free external pinger such as cron-job.org is enough.

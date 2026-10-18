@@ -20,6 +20,8 @@ class Q {
   in(c: string, vs: unknown[]) { this.filters.push((r) => vs.includes(r[c])); return this }
   lte(c: string, v: unknown) { this.filters.push((r) => toNum(r[c]) <= toNum(v)); return this }
   gte(c: string, v: unknown) { this.filters.push((r) => toNum(r[c]) >= toNum(v)); return this }
+  gt(c: string, v: unknown) { this.filters.push((r) => toNum(r[c]) > toNum(v)); return this }
+  is(c: string, v: unknown) { this.filters.push((r) => (r[c] ?? null) === v); return this }
   order(c: string) { this.orderCol = c; return this }
   limit(n: number) { this.limitN = n; return this }
   update(p: Row) { this.mode = 'update'; this.patch = p; return this }

@@ -66,6 +66,8 @@ async function receiveGuestMessage(ctx: ReceiveContext, n: NormalizedMessage): P
       phone: n.phone,
       text: n.text ?? '',
       requestUrl: ctx.requestUrl,
+      conversationId: conv.conversationId,
+      guestName: n.pushName,
       // Replies to a guest go back out on this same channel.
     })
     return r.handled ? 'stay_command' : r.registered ? 'registered_other' : r.suppressAutomation ? 'unregistered_silenced' : 'received'

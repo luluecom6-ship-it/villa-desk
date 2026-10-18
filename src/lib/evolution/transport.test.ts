@@ -43,7 +43,7 @@ describe('Evolution transport for stay messages', () => {
     expect(r.messageId).toBe('WA1')
     expect(m.sendText).toHaveBeenCalledWith(expect.anything(), '919876543210', 'hello', { delayMs: undefined })
     expect(m.recordSend).toHaveBeenCalledWith('a', { ok: true, kind: 'reply', phone: '919876543210' }, a.db)
-    expect((a.db as FakeDb).tables.messages[0]).toMatchObject({ conversation_id: 'conv-1', message_id: 'WA1', sender_type: 'agent' })
+    expect((a.db as FakeDb).tables.messages[0]).toMatchObject({ conversation_id: 'conv-1', message_id: 'WA1', sender_type: 'bot' })
   })
 
   it('scheduled sends get a short human-like pause', async () => {

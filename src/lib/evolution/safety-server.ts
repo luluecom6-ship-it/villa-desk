@@ -20,7 +20,7 @@ export interface Gate {
 export async function sendGate(
   accountId: string,
   kind: SendKind,
-  opts: { db?: SupabaseClient; now?: Date; cfg?: EvolutionConfigRow | null } = {},
+  opts: { db?: SupabaseClient; now?: Date; cfg?: EvolutionConfigRow | null; ignoreHours?: boolean } = {},
 ): Promise<Gate | null> {
   const db = opts.db ?? supabaseAdmin()
   const now = opts.now ?? new Date()
@@ -31,7 +31,7 @@ export async function sendGate(
   if (kind !== 'scheduled') return null
 
   const tz = await propertyTimeZone(db, accountId)
-  if (!inWindow(tz, now, cfg.window_start_hour, cfg.window_end_hour)) return { code: 'outside_hours' }
+  if (!opts.ignoreHours && !inWindow(tz, now, cfg.window_start_hour, cfg.window_end_hour)) return { code: 'outside_hours' }
 
   const limit = dailyLimit(cfg.warmup_started_at ? new Date(cfg.warmup_started_at) : null, now, cfg.max_daily)
   const since = new Date(now.getTime() - 36 * 3_600_000).toISOString()

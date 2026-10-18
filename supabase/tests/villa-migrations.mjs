@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -439,6 +439,21 @@ ok('a signed-in admin can create a stay (stay_ref assigned by the trigger)', adm
 let directCall = false;
 try { await as(admin, `SELECT public.next_stay_ref('${acct}', 2026)`); directCall = true; } catch { directCall = false; }
 ok('signed-in users still cannot call next_stay_ref directly', !directCall);
+
+// ---- Migration 058: guest message escalation ----------------------------------
+await rejects('alert phone must be digits with country code', `UPDATE profiles SET alert_phone='+91 98'`, /check/i);
+ok('profiles are available by default', (await one(`SELECT count(*)::int n FROM profiles WHERE available IS NOT TRUE`)).n === 0);
+await rejects('escalation wait is 1 to 240 minutes', `UPDATE properties SET escalate_after_minutes=0`, /check/i);
+const convE = (await one(`INSERT INTO conversations(account_id) VALUES ('${acct}') RETURNING id`)).id;
+await db.exec(`INSERT INTO conversation_escalations(account_id, conversation_id, due_at) VALUES ('${acct}','${convE}', now() + interval '10 minutes')`);
+await rejects('only one open escalation per conversation', `INSERT INTO conversation_escalations(account_id, conversation_id, due_at) VALUES ('${acct}','${convE}', now())`, /unique|duplicate/i);
+await rejects('a resolved row needs a resolved time', `UPDATE conversation_escalations SET status='resolved'`, /check/i);
+await db.exec(`UPDATE conversation_escalations SET status='resolved', resolved_at=now(), resolved_reason='replied'`);
+await db.exec(`INSERT INTO conversation_escalations(account_id, conversation_id, due_at) VALUES ('${acct}','${convE}', now())`);
+ok('a new chase can open after the old one is resolved', true);
+await rejects('escalations are never deleted', `DELETE FROM conversation_escalations`, /cannot be deleted/);
+ok('caretaker can read escalations', (await count(agent, 'conversation_escalations')) === 2);
+ok('viewer cannot read escalations', (await count(viewer, 'conversation_escalations')) === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

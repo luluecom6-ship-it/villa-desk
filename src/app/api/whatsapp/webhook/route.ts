@@ -874,6 +874,8 @@ async function processMessage(
       phone: identity.phone || null,
       text: contentText ?? message.text?.body ?? '',
       requestUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'http://localhost',
+      conversationId: conversation.id,
+      guestName: contact?.profile?.name ?? null,
     })
     skipUpstreamBots = stayInbound.suppressAutomation || stayInbound.handled
   } catch (err) {

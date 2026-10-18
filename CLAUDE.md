@@ -85,6 +85,15 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   (`evolution_send_log`, `evolution_event_log`) are append-only, last 4 digits only. Docs: docs/villa-evolution.md.
   Not on this channel: flows, automations, AI bot, inbound media storage, templates (plain text only).
 - Immediate sends: a new registration / corrected mobile kicks the scheduler (`kickStayScheduler`), the Stays list kicks it lazily (1/min), and a rejected ID sends `sendIdRejectedMessage` at once (any hour, reason in the guest message only, staff notified if it cannot be sent).
+- First form link is exempt from the 09:00-20:00 window (kind `immediate`; daily limit still applies).
+  The app is for the owner and caretakers; guests only use WhatsApp (sidebar subtitle "Villa operations").
+- Guest message escalation (migration 058): `src/lib/stays/escalation/` (plan.ts pure chain: available agents by
+  age, then owner, then admins only if no owner; server.ts open/run). Opened from `handleStayInbound` when a
+  `conversationId` is passed (Evolution receive + Meta webhook): registered "other" messages, and unregistered
+  numbers in villa mode. READY/1/2 still broadcast to staff. `runEscalations` runs inside `runStayScheduler`
+  (cron every minute). Reply = a `messages` row with sender_type 'agent' after the chase opened; automatic
+  Evolution sends are stored as 'bot'. Per-person `profiles.alert_phone` + `available`, `properties.escalate_after_minutes`
+  (Settings -> Your profile card). Rows are resolved, never deleted; no guest text stored.
 - M3 still to do: property settings screen (address, map, access text, templates editor).
 - Next after M3: M4 deposits, audit log, hardening; M5 checklists and damage report.
 - Open: house rules are not published yet. The editor on /stays is pre-filled with the 13 rules from

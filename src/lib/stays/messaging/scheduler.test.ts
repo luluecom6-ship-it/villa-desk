@@ -115,13 +115,12 @@ describe('the gate', () => {
 })
 
 describe('send window', () => {
-  it('holds guest messages outside 09:00 to 20:00 IST', async () => {
+  it('sends the first form link at any hour, as soon as the registration exists', async () => {
     const s = await run(ist('2026-11-05 21:00'))
-    expect(transport).not.toHaveBeenCalled()
-    expect(msg('form_link').status).toBe('queued')
-    expect(s.sent).toBe(0)
-    await run(ist('2026-11-06 09:05'))
     expect(transport).toHaveBeenCalledTimes(1)
+    expect((transport.mock.calls[0] as any[])[0].kind).toBe('immediate')
+    expect(msg('form_link').status).toBe('sent')
+    expect(s.sent).toBe(1)
   })
 })
 

@@ -6,9 +6,11 @@ import { notifyStaff } from './notify'
 import {
   computeSchedule,
   effectiveDueAt,
+  isWindowExempt,
   isStaffAlert,
   type MessageKey,
 } from './schedule'
+import { runEscalations } from '../escalation/server'
 import { logStayMessage, sendStayWhatsApp, type StayTransport } from './send'
 import {
   DEFAULT_TEMPLATES,
@@ -79,6 +81,16 @@ export interface SchedulerOptions {
   requestUrl: string
   now?: Date
   transport?: StayTransport
+}
+
+function siteUrlFrom(requestUrl: string): string {
+  const env = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
+  if (env) return env
+  try {
+    return new URL(requestUrl).origin
+  } catch {
+    return ''
+  }
 }
 
 const hhmm = (t: string): string => (t ?? '').slice(0, 5)
@@ -203,6 +215,12 @@ export async function runStayScheduler(
   }
 
   summary.alerts += await settleInterrupted(db, now)
+  // Move unanswered guest messages on to the next agent, then the owner.
+  try {
+    await runEscalations(db, siteUrlFrom(options.requestUrl), now)
+  } catch (err) {
+    console.error('[escalation] run failed:', (err as { code?: string })?.code ?? 'error')
+  }
   summary.queued = await enqueueStayMessages(db, now)
 
   const { data: due } = await db
@@ -329,7 +347,8 @@ export async function runStayScheduler(
       messageKey: row.message_key,
       text,
       template,
-      enforceWindow: true,
+      enforceWindow: !isWindowExempt(row.message_key),
+      kind: row.message_key === 'form_link' ? 'immediate' : 'scheduled',
       now,
       transport: options.transport,
     })

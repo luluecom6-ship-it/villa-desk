@@ -20,7 +20,9 @@ export class EvolutionSendError extends Error {
 const WAIT_CODES = new Set(['paused', 'outside_hours', 'daily_limit', 'disconnected'])
 
 export const evolutionStayTransport: StayTransport = async ({ db, accountId, phone, guestName, text, kind }) => {
-  const sendKind = kind === 'scheduled' ? 'scheduled' : 'reply'
+  // 'immediate' (first form link) is business-initiated like 'scheduled': it counts toward the daily
+  // limit but ignores the sending hours.
+  const sendKind = kind === 'scheduled' || kind === 'immediate' ? 'scheduled' : 'reply'
   let cfg = await loadEvolutionConfig(accountId, db)
   if (!cfg) throw new EvolutionSendError('evolution_not_configured')
 
@@ -33,7 +35,7 @@ export const evolutionStayTransport: StayTransport = async ({ db, accountId, pho
     }
   }
 
-  const gate = await sendGate(accountId, sendKind, { db, cfg })
+  const gate = await sendGate(accountId, sendKind, { db, cfg, ignoreHours: kind === 'immediate' })
   if (gate) {
     if (WAIT_CODES.has(gate.code)) throw new StayWaitError(gate.code)
     throw new EvolutionSendError(`evolution_${gate.code}`)
@@ -50,7 +52,8 @@ export const evolutionStayTransport: StayTransport = async ({ db, accountId, pho
     const now = new Date().toISOString()
     const { error } = await db.from('messages').insert({
       conversation_id: conv.conversationId,
-      sender_type: 'agent',
+      // Automatic: stored as the bot so it never counts as a person replying to the guest.
+      sender_type: 'bot',
       content_type: 'text',
       content_text: text,
       message_id: messageId,

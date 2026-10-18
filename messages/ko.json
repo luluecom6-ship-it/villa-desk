@@ -43,7 +43,7 @@
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
     "stays": "Stays",
-    "subtitle": "Guest desk"
+    "subtitle": "Villa operations"
   },
   "Header": {
     "dashboard": "대시보드",
@@ -2210,7 +2210,7 @@
     }
   },
   "Metadata": {
-    "description": "Guest registration and check-in desk for Mahinoor Stays."
+    "description": "Villa operations for the owner and caretakers of Mahinoor Stays."
   },
   "Currency": {
     "USD": "미국 달러",
@@ -3169,5 +3169,17 @@
       "not_linked": "The villa WhatsApp number is not linked yet, so no guest messages can go out.",
       "open": "Open WhatsApp link"
     }
+  },
+  "GuestAlerts": {
+    "title": "Guest messages",
+    "intro": "When a guest writes and needs a person, the first available caretaker is told. If nobody replies in time it moves to the next caretaker, then to the owner.",
+    "available": "I am on duty and can take guest messages",
+    "phone": "WhatsApp number for alerts",
+    "phoneHint": "Digits with country code. The alert comes from the villa number. Leave empty to get the bell in the app only.",
+    "minutes": "Move to the next person after (minutes)",
+    "minutesHint": "Applies to everyone. A reply from the inbox or from the villa phone stops the clock.",
+    "save": "Save",
+    "saved": "Saved.",
+    "failed": "Could not save. Please try again."
   }
 }

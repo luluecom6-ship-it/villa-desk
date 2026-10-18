@@ -18,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useTranslations } from 'next-intl';
 import { SettingsPanelHead } from './settings-panel-head';
 import { BrowserNotificationsCard } from './browser-notifications-card';
+import { GuestAlertsCard } from './guest-alerts-card';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -356,6 +357,9 @@ export function ProfileForm() {
 
       {/* Device-scoped, so it lives outside the profile form and its
           Save button — flipping the switch applies immediately. */}
+      <div className="mt-6">
+        <GuestAlertsCard />
+      </div>
       <BrowserNotificationsCard className="mt-6" />
     </section>
   );

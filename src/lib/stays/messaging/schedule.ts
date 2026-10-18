@@ -26,6 +26,14 @@ export type MessageKey = (typeof MESSAGE_KEYS)[number]
 export const STAFF_ALERT_KEYS: readonly MessageKey[] = ['id_alert_staff', 'owner_alert']
 export const isStaffAlert = (key: MessageKey): boolean => STAFF_ALERT_KEYS.includes(key)
 
+/**
+ * Messages that are not held back by the 09:00 to 20:00 window: staff alerts
+ * (internal) and the first form link, which goes out as soon as a registration
+ * with a mobile number is saved (owner decision, 18 Oct 2026). The WhatsApp
+ * number's daily limit still applies to the form link.
+ */
+export const isWindowExempt = (key: MessageKey): boolean => isStaffAlert(key) || key === 'form_link'
+
 export interface ScheduleInput {
   checkin_at: string | Date
   checkout_at: string | Date
@@ -76,5 +84,5 @@ export function shiftIntoWindow(at: Date): Date {
 
 /** The instant a row may actually be sent: due time moved into the window. */
 export function effectiveDueAt(key: MessageKey, dueAt: Date): Date {
-  return isStaffAlert(key) ? dueAt : shiftIntoWindow(dueAt)
+  return isWindowExempt(key) ? dueAt : shiftIntoWindow(dueAt)
 }
