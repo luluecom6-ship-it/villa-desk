@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
-import { connectionState } from '@/lib/evolution/client'
+import { connectionState, fetchInstance, jidDigits } from '@/lib/evolution/client'
 import { dailyLimit, dayKeyIn } from '@/lib/evolution/safety'
 import { connFromRow, evolutionServer, loadEvolutionConfig, propertyTimeZone } from '@/lib/evolution/server'
 
@@ -17,16 +17,27 @@ export async function GET() {
     } catch {
       serverReady = false
     }
+    const now = new Date()
     let row = await loadEvolutionConfig(ctx.accountId, db)
     if (!row) return NextResponse.json({ serverReady, linked: false, status: 'not_linked' })
 
     // Heal a missed webhook: while linking, ask the server for the real state.
-    if (serverReady && (row.state === 'connecting' || row.state === 'unknown')) {
+    if (serverReady && (row.state === 'connecting' || row.state === 'unknown' || row.state === 'logged_out' || row.state === 'close')) {
       try {
         const live = await connectionState(connFromRow(row))
         if (live !== row.state && live !== 'unknown') {
-          await db.from('evolution_config').update({ state: live, ...(live === 'open' ? { qr_code: null, pairing_code: null } : {}) }).eq('account_id', ctx.accountId)
-          row = { ...row, state: live, ...(live === 'open' ? { qr_code: null, pairing_code: null } : {}) }
+          const relinked = live === 'open' && row.state === 'logged_out'
+          const resume = relinked && row.paused_reason === 'logged_out'
+          const info = live === 'open' ? await fetchInstance(connFromRow(row)).catch(() => null) : null
+          const patch = {
+            state: live,
+            ...(live === 'open' ? { qr_code: null, pairing_code: null } : {}),
+            ...(info?.ownerJid && live === 'open' ? { connected_number: jidDigits(info.ownerJid) } : {}),
+            ...(relinked ? { warmup_started_at: now.toISOString() } : {}),
+            ...(resume ? { paused_at: null, paused_reason: null } : {}),
+          }
+          await db.from('evolution_config').update(patch).eq('account_id', ctx.accountId)
+          row = { ...row, ...patch }
         }
       } catch {
         /* keep the stored state */
@@ -34,7 +45,6 @@ export async function GET() {
     }
 
     const tz = await propertyTimeZone(db, ctx.accountId)
-    const now = new Date()
     const since = new Date(now.getTime() - 36 * 3_600_000).toISOString()
     const { data: sends } = await db.from('evolution_send_log').select('sent_at').eq('account_id', ctx.accountId).eq('kind', 'scheduled').eq('ok', true).gte('sent_at', since)
     const today = dayKeyIn(tz, now)

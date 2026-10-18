@@ -36,11 +36,12 @@ async function connection(db: SupabaseClient, accountId: string) {
     return null
   }
   // The saved state can be stale (a missed webhook leaves "connecting"): ask Evolution before giving up.
-  if (cfg.state !== 'open' && cfg.state !== 'logged_out' && !cfg.paused_at) {
+  if (cfg.state !== 'open' && (!cfg.paused_at || cfg.paused_reason === 'logged_out')) {
     const live = await connectionState(connFromRow(cfg)).catch(() => 'unknown' as const)
     if (live === 'open') {
-      await db.from('evolution_config').update({ state: 'open' }).eq('account_id', accountId)
-      cfg = { ...cfg, state: 'open' }
+      const resume = cfg.paused_reason === 'logged_out' // the pause came from the old link; it is live again
+      await db.from('evolution_config').update({ state: 'open', ...(resume ? { paused_at: null, paused_reason: null } : {}) }).eq('account_id', accountId)
+      cfg = { ...cfg, state: 'open', ...(resume ? { paused_at: null, paused_reason: null } : {}) }
     }
   }
   const gate = await sendGate(accountId, 'reply', { db, cfg })

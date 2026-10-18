@@ -56,6 +56,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ sec
           state: trouble === 'logged_out' ? 'logged_out' : ['open', 'connecting', 'close'].includes(state) ? state : 'unknown',
           last_event_at: now,
           ...(state === 'open' ? { qr_code: null, pairing_code: null } : {}),
+          // Linked again after a logout (a new or changed number): the pause that logout caused ends,
+          // and the warm-up limits start over for the number.
+          ...(state === 'open' && cfg.state === 'logged_out' ? { warmup_started_at: now, ...(cfg.paused_reason === 'logged_out' ? { paused_at: null, paused_reason: null, resumed_at: now } : {}) } : {}),
           ...(number && state === 'open' ? { connected_number: number } : {}),
           ...(typeof d.profileName === 'string' && state === 'open' ? { profile_name: d.profileName } : {}),
         })
