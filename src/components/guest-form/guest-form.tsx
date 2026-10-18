@@ -2,7 +2,7 @@
 
 import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { CheckCircle2, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { CheckCircle2, CircleCheck, Loader2, Plus, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,6 +45,7 @@ interface PublicFormData {
     occupants: Array<GuestFormOccupant & { age: string | number }>
     arrival: GuestFormInput['arrival']
     files: Record<string, { front: boolean; back: boolean }>
+    review?: Record<string, { status: 'approved' | 'rejected' | 'pending'; reason?: string }>
   }
 }
 
@@ -539,6 +540,8 @@ export function GuestForm({ token }: { token: string }) {
 
         {/* Lead ID */}
         <Section title={t('id.titleLead')}>
+          <ReviewNote review={data.existing.review?.lead} />
+          {data.existing.review?.lead?.status !== 'approved' && (<>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('id.type')} required>
               <select
@@ -586,6 +589,7 @@ export function GuestForm({ token }: { token: string }) {
             alreadyUploaded={data.existing.files.lead?.back}
             error={backError('lead')}
           />
+          </>)}
         </Section>
 
         {/* Other guests */}
@@ -639,6 +643,8 @@ export function GuestForm({ token }: { token: string }) {
 
                 {isAdult ? (
                   <>
+                    <ReviewNote review={data.existing.review?.[o.client_key]} />
+                    {data.existing.review?.[o.client_key]?.status !== 'approved' && (<>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <Field label={t('id.type')} required>
                         <select
@@ -685,6 +691,7 @@ export function GuestForm({ token }: { token: string }) {
                       alreadyUploaded={data.existing.files[o.client_key]?.back}
                       error={backError(o.client_key)}
                     />
+                    </>)}
                   </>
                 ) : (
                   String(o.age).trim() !== '' && (
@@ -766,6 +773,31 @@ export function GuestForm({ token }: { token: string }) {
       </form>
     </Shell>
   )
+}
+
+function ReviewNote({ review }: { review?: { status: 'approved' | 'rejected' | 'pending'; reason?: string } }) {
+  const t = useTranslations('GuestForm')
+  if (!review) return null
+  if (review.status === 'approved') {
+    return (
+      <p className="flex items-start gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+        <CircleCheck className="mt-0.5 size-4 shrink-0" />
+        <span>{t('review.approved')}</span>
+      </p>
+    )
+  }
+  if (review.status === 'rejected') {
+    return (
+      <p className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+        <span>
+          <strong>{t('review.rejected')}</strong>
+          {review.reason ? ` ${t('review.reason', { reason: review.reason })}` : ''} {t('review.uploadAgain')}
+        </span>
+      </p>
+    )
+  }
+  return <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">{t('review.pending')}</p>
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

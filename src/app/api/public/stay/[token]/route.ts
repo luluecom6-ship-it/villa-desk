@@ -64,7 +64,7 @@ export async function GET(
       admin
         .from('stay_guests')
         .select(
-          'id, role, full_name, age, is_adult, email, nationality, address, id_type, id_last4, is_foreign, visa_type, visa_expiry, arrived_in_india_on',
+          'id, role, full_name, age, is_adult, email, nationality, address, id_type, id_last4, is_foreign, visa_type, visa_expiry, arrived_in_india_on, id_verified_at, id_rejected_at, id_reject_reason',
         )
         .eq('stay_id', stay.id)
         .order('created_at', { ascending: true }),
@@ -88,6 +88,16 @@ export async function GET(
     if (!key) continue
     files[key] ??= { front: false, back: false }
     files[key][d.side as 'front' | 'back'] = true
+  }
+
+  // Where each adult's ID stands, so the guest only has to redo the rejected ones.
+  const review: Record<string, { status: 'approved' | 'rejected' | 'pending'; reason?: string }> = {}
+  for (const g of guests ?? []) {
+    const key = keyFor.get(g.id as string)
+    if (!key || !g.is_adult || !files[key]?.front) continue
+    if (g.id_verified_at) review[key] = { status: 'approved' }
+    else if (g.id_rejected_at) review[key] = { status: 'rejected', reason: (g.id_reject_reason as string | null) ?? '' }
+    else review[key] = { status: 'pending' }
   }
 
   return NextResponse.json(
@@ -136,6 +146,7 @@ export async function GET(
           purpose_of_visit: stay.purpose_of_visit ?? '',
         },
         files,
+        review,
       },
     },
     { headers: NO_STORE },
