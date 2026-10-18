@@ -224,3 +224,20 @@ describe('an open chase held by someone without a WhatsApp number', () => {
     expect(m.sendText).not.toHaveBeenCalled()
   })
 })
+
+describe('context for the agent', () => {
+  it('a chat the agent just received includes the last few messages, so the app need not be opened', async () => {
+    db.tables.messages = [
+      { id: 'm0', conversation_id: 'c1', sender_type: 'customer', message_id: 'G0', content_text: 'What time is check-in?', created_at: '2026-11-01T09:00:00Z' },
+      { id: 'm1', conversation_id: 'c1', sender_type: 'agent', message_id: 'A0', content_text: 'From 2 pm.', created_at: '2026-11-01T09:05:00Z' },
+      { id: 'm2', conversation_id: 'c1', sender_type: 'customer', message_id: 'G1', content_text: 'Can we come at noon?', created_at: T0.toISOString() },
+    ]
+    await open('Can we come at noon?', 'G1')
+    const text = sentTo('966500000002')[0]
+    expect(text).toContain('Earlier:')
+    expect(text).toContain('Guest: What time is check-in?')
+    expect(text).toContain('Us: From 2 pm.')
+    expect(text).toContain('“Can we come at noon?”')
+    expect(text.match(/Can we come at noon/g)).toHaveLength(1) // the new message is not repeated as history
+  })
+})

@@ -95,6 +95,8 @@ export function forwardText(args: {
   intro: boolean
   /** Set when this chat came from someone who did not answer in time. */
   movedFrom?: string | null
+  /** Earlier lines of the chat, oldest first, e.g. "Guest: ..." / "Us: ..." (context for a chat the agent just received). */
+  history?: string[]
 }): string {
   const who = args.card.name?.trim() || 'Guest'
   const quote = args.body?.trim() ? `“${args.body.trim()}”` : ''
@@ -104,6 +106,7 @@ export function forwardText(args: {
     `🟢 *#${args.code} · ${who}* (${maskPhone(args.card.phoneDigits)})`,
     stay || null,
     args.movedFrom ? `↪️ Moved from ${args.movedFrom} (no reply in time)` : null,
+    args.history && args.history.length > 0 ? `\n_Earlier:_\n${args.history.join('\n')}` : null,
     '',
     quote || null,
     '',

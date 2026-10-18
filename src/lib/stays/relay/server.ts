@@ -115,6 +115,23 @@ export async function guestCard(db: SupabaseClient, accountId: string, conversat
   return { card, code: Number((conv as any)?.relay_code ?? 0), stayId }
 }
 
+/** The last few messages before these ones, so the agent has the context without opening the app. */
+async function recentHistory(db: SupabaseClient, conversationId: string, skipIds: string[], limit = 4): Promise<string[]> {
+  const { data } = await db
+    .from('messages')
+    .select('message_id, sender_type, content_text, media_type, created_at')
+    .eq('conversation_id', conversationId)
+  return [...(data ?? [])]
+    .filter((m: any) => !skipIds.includes(String(m.message_id)))
+    .sort((a: any, b: any) => String(a.created_at).localeCompare(String(b.created_at)))
+    .slice(-limit)
+    .map((m: any) => {
+      const text = (m.content_text as string | null)?.trim() || (m.media_type ? `[${kindForMime(m.media_type)}]` : '')
+      return text ? `${m.sender_type === 'customer' ? 'Guest' : 'Us'}: ${clip(text.replace(/\s+/g, ' '), 160)}` : ''
+    })
+    .filter(Boolean)
+}
+
 /**
  * Copy guest messages to one team member's WhatsApp and remember each copy so a
  * swipe-reply finds its guest. A message already sent to this person is skipped.
@@ -125,6 +142,7 @@ export async function forwardToResponder(
 ): Promise<number> {
   if (!args.to.alertPhone || args.items.length === 0) return 0
   const { card, code } = await guestCard(db, args.accountId, args.conversationId)
+  const history = args.intro ? await recentHistory(db, args.conversationId, args.items.map((i) => i.messageId)).catch(() => []) : []
   let sent = 0
   for (let i = 0; i < args.items.length; i++) {
     const item = args.items[i]
@@ -138,7 +156,7 @@ export async function forwardToResponder(
     if (dup && dup.length > 0) continue
     const label = item.mediaType ? `[${kindForMime(item.mediaType)}]` : null
     const body = [label, item.text ? clip(item.text, 1500) : null].filter(Boolean).join(' ') || null
-    const text = forwardText({ code, card, body, intro: args.intro && i === 0, movedFrom: i === 0 ? args.movedFrom : null })
+    const text = forwardText({ code, card, body, intro: args.intro && i === 0, movedFrom: i === 0 ? args.movedFrom : null, history: i === 0 ? history : [] })
     const id = item.mediaUrl
       ? await tellMedia(db, args.accountId, args.to.alertPhone, { url: item.mediaUrl, mime: item.mediaType ?? null }, text)
       : await tell(db, args.accountId, args.to.alertPhone, text)
