@@ -82,6 +82,19 @@ export default function StaysPage() {
     void load()
   }, [load])
 
+  // Keep the list fresh without a reload: every 30 seconds while the tab is visible, and when it is focused again.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    const id = setInterval(tick, 30_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [load])
+
   const searching = debounced.trim().length > 0
 
   return (

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { getT } from '@/lib/i18n/translate'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
@@ -10,6 +10,7 @@ import {
   type SniffedType,
 } from '@/lib/stays/files'
 import { parseGuestForm } from '@/lib/stays/guest-form'
+import { notifyFormSubmitted } from '@/lib/stays/messaging/form-submitted'
 import {
   findFormStay,
   FORM_BUCKET,
@@ -330,6 +331,17 @@ export async function POST(
       { status: mapped.status, headers: NO_STORE },
     )
   }
+
+  // Tell the team (bell + WhatsApp) once the response is out.
+  const stayRef = (result as { stay_ref: string }).stay_ref
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '') || new URL(request.url).origin)
+  after(async () => {
+    try {
+      await notifyFormSubmitted(admin, { accountId: stay.account_id, stayRef, guestName: stay.guest_name ?? null, siteUrl })
+    } catch (e) {
+      console.error('[stay-form] team alert failed:', (e as { code?: string })?.code ?? 'error')
+    }
+  })
 
   return NextResponse.json(
     { ok: true, stay_ref: (result as { stay_ref: string }).stay_ref },

@@ -40,6 +40,18 @@ async function escalateMinutes(db: SupabaseClient, accountId: string): Promise<n
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
+/** A WhatsApp from the villa number to a team member's own alert number. Best effort; never throws. */
+export async function whatsappTeamAlert(db: SupabaseClient, accountId: string, phone: string, text: string): Promise<void> {
+  try {
+    const cfg = await loadEvolutionConfig(accountId, db)
+    if (!cfg || (await sendGate(accountId, 'reply', { db, cfg }))) return
+    await sendText(connFromRow(cfg), phone, text)
+    await recordSend(accountId, { ok: true, kind: 'reply', phone }, db)
+  } catch (e) {
+    console.error('[team-alert] whatsapp failed:', (e as { status?: number })?.status ?? 'error')
+  }
+}
+
 /** Bell in the app, and a WhatsApp from the villa number if the person set an alert number. */
 export async function alertResponder(
   db: SupabaseClient,
