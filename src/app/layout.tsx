@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
-import { Inter } from "next/font/google";
+import { Figtree, Bricolage_Grotesque } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
@@ -15,8 +15,13 @@ import {
   THEME_IDS,
 } from "@/lib/themes";
 
-const inter = Inter({
+// Figtree for reading, Bricolage Grotesque for headings (see globals.css).
+const figtree = Figtree({
   variable: "--font-sans",
+  subsets: ["latin"],
+});
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-display",
   subsets: ["latin"],
 });
 
@@ -30,8 +35,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const metadata: Metadata = {
   title: {
-    default: "wacrm",
-    template: "%s — wacrm",
+    default: "Mahinoor Stays",
+    template: "%s · Mahinoor Stays",
   },
   robots: {
     index: false,
@@ -48,7 +53,7 @@ const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: "#1f4a41",
   colorScheme: "dark light",
 };
 
@@ -97,7 +102,7 @@ export default async function RootLayout({
       lang={locale}
       data-theme={DEFAULT_THEME}
       data-mode={DEFAULT_MODE}
-      className={`${inter.variable} h-full antialiased`}
+      className={`${figtree.variable} ${bricolage.variable} h-full antialiased`}
       // The `theme-boot` script below rewrites `data-theme` and
       // `data-mode` on <html> from localStorage before React hydrates,
       // so for any non-default choice the client DOM intentionally

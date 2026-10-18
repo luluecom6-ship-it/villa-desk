@@ -14,6 +14,7 @@
  */
 
 export const THEME_IDS = [
+  "areca",
   "violet",
   "emerald",
   "cobalt",
@@ -23,7 +24,7 @@ export const THEME_IDS = [
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
-export const DEFAULT_THEME: ThemeId = "violet";
+export const DEFAULT_THEME: ThemeId = "areca";
 
 export const STORAGE_KEY = "wacrm.theme";
 
@@ -43,7 +44,7 @@ export const MODES = ["light", "dark"] as const;
 
 export type Mode = (typeof MODES)[number];
 
-export const DEFAULT_MODE: Mode = "dark";
+export const DEFAULT_MODE: Mode = "light";
 
 export const MODE_STORAGE_KEY = "wacrm.mode";
 
@@ -67,6 +68,12 @@ export interface ThemeMeta {
 }
 
 export const THEMES: ReadonlyArray<ThemeMeta> = [
+  {
+    id: "areca",
+    name: "Areca",
+    tagline: "Mahinoor Stays: deep garden green with brass.",
+    swatch: "oklch(0.47 0.08 175)",
+  },
   {
     id: "violet",
     name: "Violet",

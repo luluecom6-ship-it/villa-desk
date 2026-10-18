@@ -1,13 +1,7 @@
 import { ImageResponse } from "next/og";
 
-// Replaces the default Next.js favicon with the brand mark — Hostinger
-// violet rounded square + white chat-square glyph — matching the
-// sidebar logo in `src/components/layout/sidebar.tsx`. Next.js renders
-// this at build time and auto-injects <link rel="icon"> into <head>.
-//
-// This route takes precedence over src/app/favicon.ico, which is the
-// Next.js default and can stay on disk harmlessly (or be removed).
-
+// Favicon: the Mahinoor Stays mark (gabled roof over an arched doorway, brass on
+// areca green). Same shapes as src/components/brand/logo-mark.tsx.
 export const runtime = "edge";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
@@ -15,30 +9,11 @@ export const contentType = "image/png";
 export default function Icon() {
   return new ImageResponse(
     (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#7c3aed", // primary (Hostinger-aligned purple)
-          borderRadius: 6,
-        }}
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
+      <svg width="32" height="32" viewBox="0 0 32 32">
+        <rect width="32" height="32" rx="8" fill="#1f4a41" />
+        <path d="M6.5 15.5 16 7.5l9.5 8" fill="none" stroke="#e0a82e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12.25 25.5v-5.25a3.75 3.75 0 0 1 7.5 0v5.25" fill="none" stroke="#f3efe3" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     ),
     { ...size },
   );
