@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation'
 import { StayWaitError, type StayTransport } from '@/lib/stays/messaging/send'
 import { EvolutionError, connectionState, sendAudio, sendMedia, sendText } from './client'
@@ -98,14 +99,28 @@ export const evolutionStayTransport: StayTransport = async ({ db, accountId, pho
  * caller (sendMessageToConversation) stores the row.
  */
 export async function sendStaffViaEvolution(
-  db: SupabaseClient,
+  userDb: SupabaseClient,
   accountId: string,
   m: { phone: string; messageType: string; text: string | null; mediaUrl: string | null; filename: string | null },
 ): Promise<string> {
-  const cfg = await loadEvolutionConfig(accountId, db)
+  // The link settings are service-role only (no RLS policy for staff), so a caller's own client
+  // cannot read them: that read-as-nothing was reported as "not configured". Use the service role.
+  void userDb
+  const db = supabaseAdmin()
+  let cfg = await loadEvolutionConfig(accountId, db)
+  if (!cfg) throw new EvolutionSendError('evolution_not_configured')
+  // The saved state can be stale (a missed webhook): ask Evolution before refusing.
+  if (cfg.state !== 'open' && (!cfg.paused_at || cfg.paused_reason === 'logged_out')) {
+    const live = await connectionState(connFromRow(cfg)).catch(() => 'unknown' as const)
+    if (live === 'open') {
+      const resume = cfg.paused_reason === 'logged_out'
+      await db.from('evolution_config').update({ state: 'open', ...(resume ? { paused_at: null, paused_reason: null } : {}) }).eq('account_id', accountId)
+      cfg = { ...cfg, state: 'open', ...(resume ? { paused_at: null, paused_reason: null } : {}) }
+    }
+  }
   const gate = await sendGate(accountId, 'reply', { db, cfg })
   if (gate) throw new EvolutionSendError(`evolution_${gate.code}`)
-  const conn = connFromRow(cfg!)
+  const conn = connFromRow(cfg)
   try {
     let id: string | null
     if (m.mediaUrl && (m.messageType === 'image' || m.messageType === 'video' || m.messageType === 'document')) {
