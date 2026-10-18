@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FakeDb } from './test-support'
 import { resendToGuest } from './resend'
+import { StayWaitError } from './send'
 
 const mk = () => {
   const db = new FakeDb() as any
@@ -36,6 +37,11 @@ describe('resend to guest', () => {
     const db = mk()
     const r = await resendToGuest(db, { ...base, target: { type: 'message', messageKey: 'form_link' }, transport: async () => { throw new Error('boom') } })
     expect(r).toMatchObject({ ok: false, error: 'not_sent' })
+  })
+  it('tells staff why when the WhatsApp number is paused or disconnected', async () => {
+    const db = mk()
+    const r = await resendToGuest(db, { ...base, target: { type: 'message', messageKey: 'form_link' }, transport: async () => { throw new StayWaitError('disconnected') } })
+    expect(r).toEqual({ ok: false, error: 'not_sent', reason: 'disconnected' })
   })
   it('refuses staff alerts, unknown keys, an ID that is not rejected, and a stay without a mobile', async () => {
     const db = mk()

@@ -26,8 +26,9 @@ export const evolutionStayTransport: StayTransport = async ({ db, accountId, pho
   let cfg = await loadEvolutionConfig(accountId, db)
   if (!cfg) throw new EvolutionSendError('evolution_not_configured')
 
-  // Baileys usually reconnects by itself after a "close": ask the server before giving up.
-  if (cfg.state === 'close' && !cfg.paused_at) {
+  // The stored state can be stale (a missed webhook leaves it on "connecting" or "close"): ask the
+  // Evolution server before holding the message back.
+  if (cfg.state !== 'open' && cfg.state !== 'logged_out' && !cfg.paused_at) {
     const live = await connectionState(connFromRow(cfg)).catch(() => 'unknown' as const)
     if (live === 'open') {
       await db.from('evolution_config').update({ state: 'open' }).eq('account_id', accountId)

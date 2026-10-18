@@ -50,7 +50,7 @@ export type SendOutcome =
   | { outcome: 'blocked'; reason: string }
   | { outcome: 'failed'; reason: string }
   /** Outside 09:00 to 20:00 IST: nothing was sent, try again later. */
-  | { outcome: 'waiting' }
+  | { outcome: 'waiting'; reason?: string }
 
 export interface SendStayArgs extends Omit<StayTransportArgs, 'db'> {
   stayId: string
@@ -140,7 +140,7 @@ export async function sendStayWhatsApp(
     })
     return { outcome: 'sent', messageId }
   } catch (err) {
-    if (err instanceof StayWaitError) return { outcome: 'waiting' }
+    if (err instanceof StayWaitError) return { outcome: 'waiting', reason: err.code }
     const reason = safeReason(err)
     await logStayMessage(db, {
       accountId: args.accountId,

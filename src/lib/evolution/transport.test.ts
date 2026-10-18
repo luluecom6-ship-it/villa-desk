@@ -58,6 +58,17 @@ describe('Evolution transport for stay messages', () => {
     expect(m.sendText).not.toHaveBeenCalled()
   })
 
+  it('a stale "connecting" state is checked against the Evolution server and the send goes ahead', async () => {
+    m.cfg = { account_id: 'a', state: 'connecting', paused_at: null }
+    m.connectionState.mockResolvedValue('open')
+    m.sendText.mockResolvedValue({ id: 'WA3' })
+    const a = args('reply') as any
+    a.db.tables.evolution_config = [{ account_id: 'a', state: 'connecting' }]
+    expect((await evolutionStayTransport(a)).messageId).toBe('WA3')
+    expect(m.connectionState).toHaveBeenCalled()
+    expect(a.db.tables.evolution_config[0].state).toBe('open')
+  })
+
   it('a number that was never linked fails with a clear code (no silent fallback to Meta)', async () => {
     m.cfg = null
     await expect(evolutionStayTransport(args('reply'))).rejects.toMatchObject({ code: 'evolution_not_configured' })

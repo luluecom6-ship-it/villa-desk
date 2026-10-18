@@ -88,7 +88,7 @@ export async function resendToGuest(
     transport: args.transport,
   })
   if (result.outcome !== 'sent') {
-    return { ok: false, error: 'not_sent', reason: result.outcome === 'waiting' ? 'not_connected_or_paused' : result.reason }
+    return { ok: false, error: 'not_sent', reason: result.reason ?? 'not_connected_or_paused' }
   }
 
   // If this message has a queue row, record the new send on it.

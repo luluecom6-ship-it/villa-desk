@@ -360,7 +360,8 @@ export async function runStayScheduler(
       await finish('blocked_not_registered', { last_error: result.reason })
       summary.blocked++
     } else if (result.outcome === 'waiting') {
-      await finish('queued')
+      // Shown in the stay drawer so staff can see why it is holding (paused, not connected, daily limit).
+      await finish('queued', { last_error: result.reason ?? null })
       summary.waiting++
     } else {
       const attempts = row.attempts + 1
