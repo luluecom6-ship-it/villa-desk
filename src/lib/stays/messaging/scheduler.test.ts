@@ -115,7 +115,7 @@ describe('the gate', () => {
 })
 
 describe('send window', () => {
-  it('sends the first form link at any hour, as soon as the registration exists', async () => {
+  it('sends every message at any hour, as soon as it is due', async () => {
     const s = await run(ist('2026-11-05 21:00'))
     expect(transport).toHaveBeenCalledTimes(1)
     expect((transport.mock.calls[0] as any[])[0].kind).toBe('immediate')

@@ -62,3 +62,5 @@ set an alert number in Settings -> Your profile). No reply (from the inbox or ty
 the wait (default 10 minutes, set by an admin) -> the next available caretaker, and when none is left -> the
 owner. Chasing is done by the scheduler, so **call the cron every minute** (not every 15) for the timing to be
 accurate when nobody has the app open. A free external pinger such as cron-job.org is enough.
+
+> Update 18 Oct 2026: the 09:00 to 20:00 window is removed. Every scheduled message goes out as soon as it is due, at any hour. The WhatsApp number's daily limit (warm-up) still applies.

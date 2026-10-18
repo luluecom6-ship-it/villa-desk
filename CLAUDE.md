@@ -28,7 +28,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   a guest's behalf (both logged); only admin/owner verify or reject IDs and read the access log.
   Caretakers must never see deposit amounts. Viewers see no ID files.
 - **Logs** never contain ID numbers, file contents or full phone numbers.
-- **Time zone** is Asia/Kolkata; automated sends only 09:00 to 20:00, otherwise wait.
+- **Time zone** is Asia/Kolkata; no send window (removed 18 Oct 2026); daily limit still applies.
 - Migrations are numbered from 047, idempotent (IF NOT EXISTS / DROP POLICY IF EXISTS),
   and every new table has `account_id`, RLS on, and `is_account_member()` policies.
   Run `npm run test:migrations` after changing them.
@@ -85,7 +85,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   (`evolution_send_log`, `evolution_event_log`) are append-only, last 4 digits only. Docs: docs/villa-evolution.md.
   Not on this channel: flows, automations, AI bot, inbound media storage, templates (plain text only).
 - Immediate sends: a new registration / corrected mobile kicks the scheduler (`kickStayScheduler`), the Stays list kicks it lazily (1/min), and a rejected ID sends `sendIdRejectedMessage` at once (any hour, reason in the guest message only, staff notified if it cannot be sent).
-- First form link is exempt from the 09:00-20:00 window (kind `immediate`; daily limit still applies).
+- No automated message waits for the 09:00-20:00 window any more (owner decision 18 Oct 2026; every scheduler send is kind `immediate`; the number's daily limit still applies). Window helpers remain in schedule.ts but are unused.
   The app is for the owner and caretakers; guests only use WhatsApp (sidebar subtitle "Villa operations").
 - Guest message escalation (migration 058): `src/lib/stays/escalation/` (plan.ts pure chain: available agents by
   age, then owner, then admins only if no owner; server.ts open/run). Opened from `handleStayInbound` when a

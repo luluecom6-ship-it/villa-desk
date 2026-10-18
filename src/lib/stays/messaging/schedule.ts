@@ -32,7 +32,9 @@ export const isStaffAlert = (key: MessageKey): boolean => STAFF_ALERT_KEYS.inclu
  * with a mobile number is saved (owner decision, 18 Oct 2026). The WhatsApp
  * number's daily limit still applies to the form link.
  */
-export const isWindowExempt = (key: MessageKey): boolean => isStaffAlert(key) || key === 'form_link'
+// Owner decision, 18 Oct 2026: no message waits for the window any more, at any hour.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const isWindowExempt = (_key: MessageKey): boolean => true
 
 export interface ScheduleInput {
   checkin_at: string | Date

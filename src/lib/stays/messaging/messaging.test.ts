@@ -49,7 +49,7 @@ describe('send window (09:00 to 20:00 IST)', () => {
   })
   it('does not hold back staff alerts', () => {
     expect(iso(effectiveDueAt('owner_alert', ist('2026-11-10 22:00')))).toBe('2026-11-10 22:00')
-    expect(iso(effectiveDueAt('arrival_check', ist('2026-11-10 22:00')))).toBe('2026-11-11 09:00')
+    expect(iso(effectiveDueAt('arrival_check', ist('2026-11-10 22:00')))).toBe('2026-11-10 22:00') // no window any more
     expect(isStaffAlert('id_alert_staff')).toBe(true)
     expect(isStaffAlert('form_link')).toBe(false)
   })

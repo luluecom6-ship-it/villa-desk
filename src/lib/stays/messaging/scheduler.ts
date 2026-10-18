@@ -348,7 +348,7 @@ export async function runStayScheduler(
       text,
       template,
       enforceWindow: !isWindowExempt(row.message_key),
-      kind: row.message_key === 'form_link' ? 'immediate' : 'scheduled',
+      kind: 'immediate',
       now,
       transport: options.transport,
     })
