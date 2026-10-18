@@ -56,6 +56,9 @@ export async function handleStayInbound(
     guestName?: string | null
     /** The guest's WhatsApp message id (so it is forwarded to the agent once). */
     messageId?: string
+    /** A photo, voice note, video or file the guest sent (already stored). */
+    mediaUrl?: string | null
+    mediaType?: string | null
     now?: Date
     transport?: StayTransport
   },
@@ -76,6 +79,8 @@ export async function handleStayInbound(
           label: args.guestName ? args.guestName.split(/\s+/)[0] : 'an unknown number',
           preview: args.text,
           messageId: args.messageId,
+          mediaUrl: args.mediaUrl,
+          mediaType: args.mediaType,
           siteUrl: siteUrlOf(args.requestUrl),
           now,
         }).catch((e) => console.error('[escalation] open failed:', (e as { code?: string })?.code ?? 'error'))
@@ -155,6 +160,8 @@ export async function handleStayInbound(
       label: who,
       preview: args.text,
       messageId: args.messageId,
+      mediaUrl: args.mediaUrl,
+      mediaType: args.mediaType,
       siteUrl: siteUrlOf(args.requestUrl),
       now,
     })

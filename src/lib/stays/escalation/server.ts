@@ -60,7 +60,7 @@ export async function alertResponder(
   const title = `${info.escalated ? 'Not answered yet: ' : ''}Guest message: ${info.label}`
   await db
     .from('notifications')
-    .insert({ account_id: accountId, user_id: to.userId, type: 'stay_alert', title: clip(title, 200), body: clip(info.preview, 200) })
+    .insert({ account_id: accountId, user_id: to.userId, type: 'stay_alert', title: clip(title, 200), body: clip(info.preview || 'Photo, voice note or file. Open the inbox to see it.', 200) })
     .then(({ error }: { error: { code?: string } | null }) => {
       if (error) console.error('[escalation] bell failed:', error.code)
     })
@@ -77,7 +77,7 @@ export async function alertResponder(
 
 export async function openEscalation(
   db: SupabaseClient,
-  args: { accountId: string; conversationId: string; stayId: string | null; label: string; preview: string; siteUrl: string; messageId?: string; now?: Date },
+  args: { accountId: string; conversationId: string; stayId: string | null; label: string; preview: string; siteUrl: string; messageId?: string; mediaUrl?: string | null; mediaType?: string | null; now?: Date },
 ): Promise<'opened' | 'already_open' | 'nobody'> {
   const now = args.now ?? new Date()
   const { data: open } = await db
@@ -86,7 +86,7 @@ export async function openEscalation(
     .eq('conversation_id', args.conversationId)
     .eq('status', 'open')
     .limit(1)
-  const item: RelayItem = { messageId: args.messageId ?? `msg-${args.conversationId}-${now.getTime()}`, text: args.preview }
+  const item: RelayItem = { messageId: args.messageId ?? `msg-${args.conversationId}-${now.getTime()}`, text: args.preview || null, mediaUrl: args.mediaUrl ?? null, mediaType: args.mediaType ?? null }
   if (open && open.length > 0) {
     // Another message while someone has the chat: it follows to the same person.
     const current = (open[0].notified_user_ids ?? []).at(-1)

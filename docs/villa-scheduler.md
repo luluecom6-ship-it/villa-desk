@@ -77,6 +77,8 @@ saved in the inbox as an agent message (which stops the clock).
 * A reply that cannot be matched to a guest is not sent; the agent is asked which chat it is.
 * Not answered in time (default 10 min) -> the next caretaker gets the waiting messages and the first is told,
   then the owner. The caretaker who answered a guest last time gets that guest's next message first.
-* Only text can be sent back for now (photos and voice notes from the agent are refused with a note).
+* Photos, voice notes, videos and files work both ways: a guest's media is stored (inbox) and sent to the agent;
+  an agent's photo / voice note / file (with an optional caption) goes to the guest. A voice note from a guest
+  arrives as a line with the chat details followed by the audio.
 * A team member's number is never a guest chat. Do not test by writing to the villa number from your own
   team number: it will be read as an answer, not a guest message. Use another phone.

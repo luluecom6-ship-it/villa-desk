@@ -3,6 +3,8 @@ import { handleStayInbound } from '@/lib/stays/messaging/inbound'
 import { logStayMessage } from '@/lib/stays/messaging/send'
 import { findRelayAgent, onAgentMessage } from '@/lib/stays/relay/server'
 import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation'
+import { supabaseAdmin } from '@/lib/automations/admin-client'
+import { hasMediaType, storeEvolutionMedia } from './media'
 import { normalizeUpdates, normalizeUpsert, type NormalizedMessage } from './normalize'
 
 // Evolution webhook deliveries -> the inbox, plus the stay logic.
@@ -30,7 +32,14 @@ function preview(n: NormalizedMessage): string {
   return n.text ?? `[${n.type}]`
 }
 
-async function storeMessage(ctx: ReceiveContext, n: NormalizedMessage, conversationId: string, from: 'customer' | 'agent'): Promise<boolean> {
+type Stored = { url: string | null; mime: string | null }
+
+async function mediaFor(ctx: ReceiveContext, n: NormalizedMessage): Promise<Stored> {
+  if (!hasMediaType(n.type)) return { url: null, mime: null }
+  return storeEvolutionMedia(ctx.db, supabaseAdmin().storage, ctx.accountId, n)
+}
+
+async function storeMessage(ctx: ReceiveContext, n: NormalizedMessage, conversationId: string, from: 'customer' | 'agent', media: Stored = { url: null, mime: null }): Promise<boolean> {
   const { data, error } = await ctx.db
     .from('messages')
     .upsert(
@@ -39,6 +48,8 @@ async function storeMessage(ctx: ReceiveContext, n: NormalizedMessage, conversat
         sender_type: from,
         content_type: CONTENT_TYPE[n.type],
         content_text: n.text,
+        media_url: media.url,
+        media_type: media.mime,
         message_id: n.id,
         status: from === 'customer' ? 'delivered' : 'sent',
         created_at: new Date(Number(n.timestamp) * 1000).toISOString(),
@@ -55,7 +66,8 @@ async function storeMessage(ctx: ReceiveContext, n: NormalizedMessage, conversat
 
 async function receiveGuestMessage(ctx: ReceiveContext, n: NormalizedMessage): Promise<string> {
   const conv = await resolveConversationByPhone(ctx.db, ctx.accountId, `+${n.phone}`, n.pushName, { requireMetaConfig: false })
-  const fresh = await storeMessage(ctx, n, conv.conversationId, 'customer')
+  const media = await mediaFor(ctx, n)
+  const fresh = await storeMessage(ctx, n, conv.conversationId, 'customer', media)
   if (!fresh) return 'duplicate'
   await ctx.db.rpc('bump_conversation_on_inbound', { p_conversation_id: conv.conversationId, p_last_message_text: preview(n) })
   await ctx.db.from('conversations').update({ channel: 'evolution' }).eq('id', conv.conversationId)
@@ -70,6 +82,8 @@ async function receiveGuestMessage(ctx: ReceiveContext, n: NormalizedMessage): P
       conversationId: conv.conversationId,
       guestName: n.pushName,
       messageId: n.id,
+      mediaUrl: media.url,
+      mediaType: media.mime,
       // Replies to a guest go back out on this same channel.
     })
     return r.handled ? 'stay_command' : r.registered ? 'registered_other' : r.suppressAutomation ? 'unregistered_silenced' : 'received'
@@ -86,7 +100,7 @@ async function recordPhoneMessage(ctx: ReceiveContext, n: NormalizedMessage): Pr
   const { data: existing } = await ctx.db.from('messages').select('id').eq('message_id', n.id).limit(1)
   if (existing && existing.length > 0) return 'own_send_echo'
   const conv = await resolveConversationByPhone(ctx.db, ctx.accountId, `+${n.phone}`, null, { requireMetaConfig: false })
-  const fresh = await storeMessage(ctx, n, conv.conversationId, 'agent')
+  const fresh = await storeMessage(ctx, n, conv.conversationId, 'agent', await mediaFor(ctx, n))
   if (!fresh) return 'duplicate'
   const now = new Date().toISOString()
   await ctx.db
@@ -98,11 +112,12 @@ async function recordPhoneMessage(ctx: ReceiveContext, n: NormalizedMessage): Pr
 
 async function relayAgentMessage(ctx: ReceiveContext, agent: NonNullable<Awaited<ReturnType<typeof findRelayAgent>>>, n: NormalizedMessage): Promise<string> {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '') || (() => { try { return new URL(ctx.requestUrl).origin } catch { return '' } })()
+  const media = await mediaFor(ctx, n)
   return onAgentMessage(ctx.db, {
     accountId: ctx.accountId,
     agent,
     siteUrl,
-    msg: { id: n.id, text: n.text, quotedId: n.quotedId, hasMedia: !!n.media || ['image', 'video', 'document', 'audio', 'sticker'].includes(n.type) },
+    msg: { id: n.id, text: n.text, quotedId: n.quotedId, hasMedia: hasMediaType(n.type), mediaUrl: media.url, mediaType: media.mime },
   })
 }
 

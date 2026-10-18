@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- rows from untyped supabase selects */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { sendReaction, sendText, userJid } from '@/lib/evolution/client'
+import { sendAudio, sendMedia, sendReaction, sendText, userJid } from '@/lib/evolution/client'
+import { kindForMime } from '@/lib/evolution/media'
 import { recordSend, sendGate } from '@/lib/evolution/safety-server'
 import { connFromRow, loadEvolutionConfig } from '@/lib/evolution/server'
 import { sendMessageToConversation } from '@/lib/whatsapp/send-message'
@@ -21,6 +22,9 @@ import { HELP_TEXT, forwardText, maskPhone, parseAgentMessage, type GuestCard } 
 export interface RelayItem {
   messageId: string
   text: string | null
+  /** A photo, voice note, video or file (a stored copy). */
+  mediaUrl?: string | null
+  mediaType?: string | null
 }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
@@ -42,6 +46,28 @@ export async function tell(db: SupabaseClient, accountId: string, phone: string,
     return id ?? `tell-${Date.now()}`
   } catch (e) {
     console.error('[relay] could not message a team member:', (e as { status?: number })?.status ?? 'error')
+    return null
+  }
+}
+
+/** Send a stored photo / video / file / voice note to a team member's WhatsApp, with the guest's context as the caption. */
+export async function tellMedia(db: SupabaseClient, accountId: string, phone: string, media: { url: string; mime: string | null }, caption: string): Promise<string | null> {
+  try {
+    const conn = await connection(db, accountId)
+    if (!conn) return null
+    const kind = kindForMime(media.mime)
+    let id: string | null
+    if (kind === 'audio') {
+      // A voice note has no caption: the context goes first as text, then the audio.
+      id = (await sendText(conn, phone, caption)).id
+      await sendAudio(conn, phone, media.url).catch(() => undefined)
+    } else {
+      id = (await sendMedia(conn, phone, { kind, url: media.url, caption })).id
+    }
+    await recordSend(accountId, { ok: true, kind: 'reply', phone }, db)
+    return id ?? `tell-${Date.now()}`
+  } catch (e) {
+    console.error('[relay] could not send media to a team member:', (e as { status?: number })?.status ?? 'error')
     return null
   }
 }
@@ -94,8 +120,12 @@ export async function forwardToResponder(
       .eq('source_message_id', item.messageId)
       .limit(1)
     if (dup && dup.length > 0) continue
-    const text = forwardText({ code, card, body: item.text ? clip(item.text, 1500) : null, intro: args.intro && i === 0, movedFrom: i === 0 ? args.movedFrom : null })
-    const id = await tell(db, args.accountId, args.to.alertPhone, text)
+    const label = item.mediaType ? `[${kindForMime(item.mediaType)}]` : null
+    const body = [label, item.text ? clip(item.text, 1500) : null].filter(Boolean).join(' ') || null
+    const text = forwardText({ code, card, body, intro: args.intro && i === 0, movedFrom: i === 0 ? args.movedFrom : null })
+    const id = item.mediaUrl
+      ? await tellMedia(db, args.accountId, args.to.alertPhone, { url: item.mediaUrl, mime: item.mediaType ?? null }, text)
+      : await tell(db, args.accountId, args.to.alertPhone, text)
     if (!id) continue
     sent++
     await db.from('relay_forwards').insert({
@@ -113,14 +143,14 @@ export async function forwardToResponder(
 export async function unansweredGuestMessages(db: SupabaseClient, conversationId: string, since: string, limit = 5): Promise<RelayItem[]> {
   const { data } = await db
     .from('messages')
-    .select('message_id, content_text, created_at')
+    .select('message_id, content_text, media_url, media_type, created_at')
     .eq('conversation_id', conversationId)
     .eq('sender_type', 'customer')
     .gte('created_at', since)
   return [...(data ?? [])]
     .sort((a: any, b: any) => String(a.created_at).localeCompare(String(b.created_at)))
     .slice(-limit)
-    .map((m: any) => ({ messageId: String(m.message_id), text: (m.content_text as string | null) ?? null }))
+    .map((m: any) => ({ messageId: String(m.message_id), text: (m.content_text as string | null) ?? null, mediaUrl: (m.media_url as string | null) ?? null, mediaType: (m.media_type as string | null) ?? null }))
 }
 
 /** The team member registered under this WhatsApp number, if any. Staff numbers never become guest chats. */
@@ -133,8 +163,11 @@ export interface AgentMessage {
   id: string
   text: string | null
   quotedId: string | null
-  /** The agent sent a photo, voice note or file (only text can be relayed). */
+  /** The agent sent a photo, voice note, video or file. */
   hasMedia: boolean
+  /** Its stored copy (null if it could not be downloaded). */
+  mediaUrl?: string | null
+  mediaType?: string | null
 }
 
 async function openEscalationsOf(db: SupabaseClient, accountId: string, userId: string) {
@@ -260,14 +293,16 @@ export async function onAgentMessage(
     return 'agent_transfer'
   }
 
-  // A reply for the guest.
-  if (msg.hasMedia && !cmd.text) {
-    await tell(db, accountId, phone, '⚠️ Only text can be sent to guests from here for now. Please type your answer.')
-    return 'agent_media_unsupported'
+  // A reply for the guest: text, or a photo / voice note / video / file (stored copy), with the agent's caption.
+  if (msg.hasMedia && !msg.mediaUrl) {
+    await tell(db, accountId, phone, '⚠️ Not sent: that photo, voice note or file could not be downloaded. Please send it again.')
+    return 'agent_media_failed'
   }
-  if (!cmd.text) return 'agent_empty'
+  if (!cmd.text && !msg.mediaUrl) return 'agent_empty'
   try {
-    await sendMessageToConversation(db, accountId, { conversationId, messageType: 'text', contentText: cmd.text })
+    await sendMessageToConversation(db, accountId, msg.mediaUrl
+      ? { conversationId, messageType: kindForMime(msg.mediaType), contentText: cmd.text || null, mediaUrl: msg.mediaUrl }
+      : { conversationId, messageType: 'text', contentText: cmd.text })
   } catch (e) {
     await tell(db, accountId, phone, clip(`⚠️ Not delivered to ${label}: ${e instanceof Error ? e.message : String(e)}`, 500))
     return 'agent_reply_failed'

@@ -3,13 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeDb } from '../messaging/test-support'
 
 const m = vi.hoisted(() => ({
+  sendMedia: vi.fn(),
+  sendAudio: vi.fn(),
   sendText: vi.fn(),
   sendReaction: vi.fn(),
   sendMessage: vi.fn(),
 }))
 vi.mock('@/lib/evolution/server', () => ({ loadEvolutionConfig: async () => ({ account_id: 'a', state: 'open' }), connFromRow: () => ({}) }))
 vi.mock('@/lib/evolution/safety-server', () => ({ sendGate: async () => null, recordSend: async () => undefined }))
-vi.mock('@/lib/evolution/client', () => ({ sendText: m.sendText, sendReaction: m.sendReaction, userJid: (n: string) => `${n}@s.whatsapp.net` }))
+vi.mock('@/lib/evolution/client', () => ({ sendText: m.sendText, sendMedia: m.sendMedia, sendAudio: m.sendAudio, sendReaction: m.sendReaction, userJid: (n: string) => `${n}@s.whatsapp.net` }))
 vi.mock('@/lib/whatsapp/send-message', () => ({ sendMessageToConversation: m.sendMessage }))
 
 import { findRelayAgent, forwardToResponder, onAgentMessage } from './server'
@@ -23,6 +25,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   let n = 0
   m.sendText.mockImplementation(async () => ({ id: `FWD${++n}` }))
+  m.sendMedia.mockResolvedValue({ id: 'FWDM' })
+  m.sendAudio.mockResolvedValue({ id: 'FWDA' })
   m.sendReaction.mockResolvedValue(undefined)
   m.sendMessage.mockResolvedValue({ messageId: 'x', whatsappMessageId: 'y' })
   db = new FakeDb()
@@ -139,11 +143,58 @@ describe('agent\'s WhatsApp -> the guest', () => {
     expect(db.tables.conversation_escalations[0].notified_user_ids.at(-1)).toBe('care2')
   })
 
-  it('a photo or voice note cannot be relayed yet and the agent is told', async () => {
+  it('a photo from the agent goes to the guest with their caption', async () => {
     await open()
-    const r = await onAgentMessage(db, { accountId: 'a', agent: await agent(), siteUrl: '', msg: { id: 'P1', text: null, quotedId: 'FWD1', hasMedia: true } })
-    expect(r).toBe('agent_media_unsupported')
+    const r = await onAgentMessage(db, { accountId: 'a', agent: await agent(), siteUrl: '', msg: { id: 'P1', text: 'Here is the parking map', quotedId: 'FWD1', hasMedia: true, mediaUrl: 'https://cdn.test/map.jpg', mediaType: 'image/jpeg' } })
+    expect(r).toBe('agent_reply_sent')
+    expect(m.sendMessage).toHaveBeenCalledWith(db, 'a', { conversationId: 'c1', messageType: 'image', contentText: 'Here is the parking map', mediaUrl: 'https://cdn.test/map.jpg' })
+  })
+
+  it('a voice note from the agent goes as audio', async () => {
+    await open()
+    await onAgentMessage(db, { accountId: 'a', agent: await agent(), siteUrl: '', msg: { id: 'V1', text: null, quotedId: 'FWD1', hasMedia: true, mediaUrl: 'https://cdn.test/v.ogg', mediaType: 'audio/ogg' } })
+    expect(m.sendMessage.mock.calls[0][2]).toMatchObject({ messageType: 'audio', mediaUrl: 'https://cdn.test/v.ogg', contentText: null })
+  })
+
+  it('media that could not be downloaded is not sent and the agent is told', async () => {
+    await open()
+    const r = await onAgentMessage(db, { accountId: 'a', agent: await agent(), siteUrl: '', msg: { id: 'P2', text: null, quotedId: 'FWD1', hasMedia: true, mediaUrl: null, mediaType: null } })
+    expect(r).toBe('agent_media_failed')
     expect(m.sendMessage).not.toHaveBeenCalled()
+  })
+})
+
+describe('guest media -> the agent', () => {
+  const openMedia = (messageId: string, mediaUrl: string, mediaType: string, text: string | null = '') =>
+    openEscalation(db, { accountId: 'a', conversationId: 'c1', stayId: 's1', label: 'Asha', preview: text ?? '', messageId, mediaUrl, mediaType, siteUrl: 'https://x.test', now: T0 })
+
+  it('a guest photo reaches the agent as a photo with the chat details as the caption', async () => {
+    await openMedia('M1', 'https://cdn.test/leak.jpg', 'image/jpeg', 'Water is leaking')
+    expect(m.sendMedia).toHaveBeenCalledTimes(1)
+    const [, to, opts] = m.sendMedia.mock.calls[0]
+    expect(to).toBe('966500000002')
+    expect(opts).toMatchObject({ kind: 'image', url: 'https://cdn.test/leak.jpg' })
+    expect(opts.caption).toContain('#482')
+    expect(opts.caption).toContain('Water is leaking')
+    expect(db.tables.relay_forwards[0]).toMatchObject({ forward_message_id: 'FWDM', source_message_id: 'M1' })
+  })
+
+  it('a guest voice note arrives as the chat details plus the audio', async () => {
+    await openMedia('M2', 'https://cdn.test/v.ogg', 'audio/ogg')
+    expect(sentTo('966500000002')[0]).toContain('[audio]')
+    expect(m.sendAudio).toHaveBeenCalledTimes(1)
+  })
+
+  it('media that was not stored still reaches the agent as a note', async () => {
+    await openEscalation(db, { accountId: 'a', conversationId: 'c1', stayId: 's1', label: 'Asha', preview: '', messageId: 'M3', siteUrl: '', now: T0 })
+    expect(m.sendMedia).not.toHaveBeenCalled()
+    expect(m.sendText).toHaveBeenCalled()
+  })
+
+  it('swiping-replying to a forwarded photo still finds the guest', async () => {
+    await openMedia('M4', 'https://cdn.test/x.jpg', 'image/jpeg')
+    const a = (await findRelayAgent(db, 'a', '966500000002'))!
+    expect(await onAgentMessage(db, { accountId: 'a', agent: a, siteUrl: '', msg: { id: 'R1', text: 'Sending someone', quotedId: 'FWDM', hasMedia: false } })).toBe('agent_reply_sent')
   })
 })
 
