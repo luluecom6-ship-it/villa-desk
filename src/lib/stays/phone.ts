@@ -16,6 +16,7 @@ export interface StayPhoneResult {
  *   "+91 98765-43210"  -> "919876543210"
  *   "98765 43210"      -> "919876543210"   (10-digit national number)
  *   "098765 43210"     -> "919876543210"   (trunk 0 removed)
+ *   "572657189" + 966  -> "966572657189"   (any length national number gets the chosen code)
  *   "919876543210"     -> "919876543210"   (already has the country code)
  *   "+971 50 123 4567" -> "971501234567"   (explicit + wins over the default)
  *   ""                 -> null             (no number: the stay stays a draft)
@@ -36,12 +37,13 @@ export function normalizeStayPhone(
   if (!international) {
     // Remove the national trunk prefix(es), then add the default country
     // code to a bare national number.
+    // The chosen country code is always added, except when the number already
+    // starts with it and is long enough to be code + number (so "966572657189"
+    // is kept but the 9-digit Saudi "572657189" gets 966 in front). Numbers
+    // typed with "+" are never touched.
     const national = digits.replace(/^0+/, '')
-    if (national.length === 10) {
-      digits = defaultCountryCode + national
-    } else {
-      digits = national
-    }
+    const hasCode = national.startsWith(defaultCountryCode) && national.length >= 11
+    digits = hasCode ? national : defaultCountryCode + national
   }
 
   return isValidStayPhone(digits)

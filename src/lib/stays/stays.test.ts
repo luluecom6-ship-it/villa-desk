@@ -18,6 +18,14 @@ describe('normalizeStayPhone', () => {
     expect(normalizeStayPhone(input)).toEqual({ phone: expected })
   })
 
+  it('adds the chosen country code to a national number of any length (Saudi numbers have 9 digits)', () => {
+    expect(normalizeStayPhone('572657189', '966')).toEqual({ phone: '966572657189' })
+    expect(normalizeStayPhone('0572657189', '966')).toEqual({ phone: '966572657189' })
+    expect(normalizeStayPhone('966572657189', '966')).toEqual({ phone: '966572657189' })
+    expect(normalizeStayPhone('+966 57 265 7189', '91')).toEqual({ phone: '966572657189' })
+    expect(normalizeStayPhone('501234567', '971')).toEqual({ phone: '971501234567' })
+  })
+
   it('treats empty input as "no number" (a draft), not an error', () => {
     expect(normalizeStayPhone('')).toEqual({ phone: null })
     expect(normalizeStayPhone('   ')).toEqual({ phone: null })
