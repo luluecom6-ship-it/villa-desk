@@ -50,6 +50,8 @@ export async function PATCH(request: Request, { params }: Ctx) {
       if (missing.length > 0) return NextResponse.json({ error: 'incomplete', missing: missing.map((m) => m.key) }, { status: 409 })
       const { error } = await db.from('checklist_runs').update({ status: 'completed', completed_at: new Date().toISOString(), completed_by: ctx.userId, completed_by_name: await actorName(db, ctx.userId) }).eq('id', r.id).eq('status', 'in_progress')
       if (error) return NextResponse.json({ error: 'save_failed' }, { status: 500 })
+      // Finishing the arrival checklist means the guest has arrived: Registered -> Checked in.
+      if (kind === 'arrival') await db.from('stays').update({ status: 'checked_in' }).eq('id', id).eq('account_id', ctx.accountId).eq('status', 'registered')
       return NextResponse.json({ ok: true })
     }
 

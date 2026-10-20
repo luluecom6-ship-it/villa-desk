@@ -23,7 +23,7 @@ const APPLY_ERR: Record<string, string> = {
 }
 const inr = (n: number) => `INR ${Number.isInteger(n) ? n : n.toFixed(2)}`
 
-export function StayChecklists({ stayId, isAdmin, active }: { stayId: string; isAdmin: boolean; active: boolean }) {
+export function StayChecklists({ stayId, isAdmin, active, onChanged }: { stayId: string; isAdmin: boolean; active: boolean; onChanged?: () => void }) {
   const [runs, setRuns] = useState<Partial<Record<RunKind, RunMeta>>>({})
   const [diffs, setDiffs] = useState<Difference[]>([])
   const [damage, setDamage] = useState<DamageRow[]>([])
@@ -143,7 +143,7 @@ export function StayChecklists({ stayId, isAdmin, active }: { stayId: string; is
           <Button size="sm" variant="outline" onClick={() => setAdding(true)}>Report damage</Button>
         )}
       </div>
-      {runner && <ChecklistRunner stayId={stayId} kind={runner} open onClose={() => { setRunner(null); void load() }} onChanged={() => void load()} />}
+      {runner && <ChecklistRunner stayId={stayId} kind={runner} open onClose={() => { setRunner(null); void load() }} onChanged={() => { void load(); onChanged?.() }} />}
     </div>
   )
 }

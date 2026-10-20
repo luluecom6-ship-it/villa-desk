@@ -613,7 +613,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                 )}
 
                 {canIds && stay.status !== 'cancelled' && stay.status !== 'sample' && (
-                  <StayChecklists key={stay.id} stayId={stay.id} isAdmin={isAdmin} active={stay.status === 'registered' || stay.status === 'checked_in'} />
+                  <StayChecklists key={stay.id} stayId={stay.id} isAdmin={isAdmin} active={stay.status === 'registered' || stay.status === 'checked_in'} onChanged={onChanged} />
                 )}
 
                 {canCheckout && (
