@@ -2,7 +2,7 @@
 
 The scheduler sends the stay WhatsApp messages (form link, reminders, arrival info,
 access details, check-out reminder, review request) and raises the two staff alerts.
-It runs when `/api/stays/cron` is called. Call it **every 15 minutes**.
+It runs when `/api/stays/cron` is called. Call it **every minute** (the n8n workflow `docs/n8n-stay-ping.json` does exactly that: import it, set the app address and the secret, activate it).
 
 ```
 GET https://<your-app>/api/stays/cron

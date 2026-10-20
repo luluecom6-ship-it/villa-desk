@@ -34,8 +34,8 @@ describe('parseInboundCommand', () => {
   it('reads READY and 1, 2, anything else', () => {
     expect(parseInboundCommand('READY')).toBe('ready')
     expect(parseInboundCommand('  ready! ')).toBe('ready')
-    expect(parseInboundCommand('1')).toBe('ready')
-    expect(parseInboundCommand('2')).toBe('access')
+    expect(parseInboundCommand('1')).toBe('other') // numbers belong to the menu now
+    expect(parseInboundCommand('wifi')).toBe('access')
     expect(parseInboundCommand('help')).toBe('other')
     expect(parseInboundCommand('I am ready to go')).toBe('other')
     expect(parseInboundCommand('')).toBe('other')
@@ -51,17 +51,17 @@ describe('registered guest', () => {
     expect(transport).not.toHaveBeenCalled()
   })
 
-  it('2 resends the access instructions when IDs are verified', async () => {
-    const r = await inbound('919000011111', '2')
+  it('WIFI resends the access instructions when IDs are verified', async () => {
+    const r = await inbound('919000011111', 'wifi')
     expect(r.handled).toBe(true)
     expect(transport).toHaveBeenCalledTimes(1)
     expect(transport.mock.calls[0][0].text).toContain('Code 1234')
     expect(transport.mock.calls[0][0].phone).toBe('919000011111')
   })
 
-  it('2 sends nothing while IDs are unverified and tells the team', async () => {
+  it('WIFI sends nothing while IDs are unverified and tells the team', async () => {
     db.tables.stay_guests[0].id_verified_at = null
-    await inbound('919000011111', '2')
+    await inbound('919000011111', 'wifi')
     expect(transport).not.toHaveBeenCalled()
     expect(db.tables.notifications[0].title).toMatch(/access details/)
   })
@@ -76,6 +76,87 @@ describe('registered guest', () => {
   it('a stay past checkout + 7 days is no longer registered', async () => {
     const r = await handleStayInbound(db as never, { accountId: 'a1', phone: '919000011111', text: 'READY', requestUrl: REQUEST, now: ist('2026-11-25 10:00'), transport: transport as never })
     expect(r.registered).toBe(false)
+  })
+})
+
+describe('the guest menu', () => {
+  beforeEach(() => {
+    db.tables.conversations = [{ id: 'c1', account_id: 'a1', guest_menu_state: null, guest_menu_at: null }]
+  })
+  const say = (text: string, at: Date = NOW) =>
+    handleStayInbound(db as never, { accountId: 'a1', phone: '919000011111', text, requestUrl: REQUEST, conversationId: 'c1', messageId: `M-${text}-${at.getTime()}`, now: at, transport: transport as never })
+  const lastText = () => transport.mock.calls.at(-1)?.[0].text as string
+
+  it.each(['hi', 'HELLO', 'Hey', 'hii', 'Good morning', 'menu'])('"%s" shows the menu and alerts nobody', async (hello) => {
+    const r = await say(hello)
+    expect(r.handled).toBe(true)
+    expect(lastText()).toContain('1️⃣ Update ID / registration form')
+    expect(lastText()).toContain('Connect with the caretaker')
+    expect(lastText()).toContain('Food')
+    expect(db.tables.conversations[0].guest_menu_state).toBe('main')
+    expect(db.tables.notifications ?? []).toHaveLength(0)
+  })
+
+  it('a sentence is not a greeting', async () => {
+    await say('hi, where is the parking?')
+    expect(transport).not.toHaveBeenCalled()
+  })
+
+  it('1 sends the form link and the ID status', async () => {
+    await say('hi')
+    await say('1')
+    expect(lastText()).toContain('https://villa.test/stay/abcdef0123456a')
+    expect(lastText()).toContain('all IDs are approved')
+    expect(db.tables.conversations[0].guest_menu_state).toBeNull()
+  })
+
+  it('2 sends the access details when IDs are approved', async () => {
+    await say('hi')
+    await say('2')
+    expect(lastText()).toContain('Code 1234')
+  })
+
+  it('3 tells the caretaker and answers the guest, without a phone number', async () => {
+    await say('hi')
+    await say('3')
+    expect(lastText()).toContain('caretaker has been told')
+    expect(lastText()).not.toMatch(/\d{6,}/)
+    expect((db.tables.notifications ?? []).length).toBeGreaterThan(0)
+  })
+
+  it('4 asks for the food request and the next message goes to the caretaker', async () => {
+    await say('hi')
+    await say('4')
+    expect(lastText()).toContain('Food')
+    expect(db.tables.conversations[0].guest_menu_state).toBe('food')
+    await say('2 vegetarian thalis at 8 pm')
+    expect(lastText()).toContain('passed your food request')
+    expect(db.tables.notifications.some((n) => String(n.body).includes('Food request') && String(n.body).includes('thalis'))).toBe(true)
+    expect(db.tables.conversations[0].guest_menu_state).toBeNull()
+  })
+
+  it('a bare number with no menu open shows the menu instead of guessing', async () => {
+    await say('2')
+    expect(lastText()).toContain('Reply with a number')
+    expect(db.tables.notifications ?? []).toHaveLength(0)
+  })
+
+  it('a menu answer is only read for 30 minutes', async () => {
+    await say('hi')
+    await say('3', new Date(NOW.getTime() + 31 * 60_000))
+    expect(lastText()).toContain('Reply with a number') // the menu again, not the caretaker
+  })
+
+  it('5 records on the way', async () => {
+    await say('hi')
+    await say('5')
+    expect(db.tables.stays[0].on_the_way_at).not.toBeNull()
+  })
+
+  it('an unregistered number gets no menu', async () => {
+    const r = await handleStayInbound(db as never, { accountId: 'a1', phone: '919555555555', text: 'hi', requestUrl: REQUEST, conversationId: 'c1', now: NOW, transport: transport as never })
+    expect(r.registered).toBe(false)
+    expect(transport).not.toHaveBeenCalled()
   })
 })
 

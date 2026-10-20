@@ -1,0 +1,123 @@
+{
+  "name": "Villa stays: 1-minute ping",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Villa stay scheduler ping\nCalls the app every minute so timed guest messages (reminders, check-in details, check-out), retries, and the 'no reply, move to the next caretaker' chase run on time.\n\n**Before activating:**\n1. In the *Call villa app* node, replace `YOUR-APP.vercel.app` with your app's address.\n2. Replace `PASTE_AUTOMATION_CRON_SECRET` with the value of `AUTOMATION_CRON_SECRET` from Vercel.\n3. Turn the workflow **Active** (top right).\n\nA healthy reply looks like `{\"ok\":true,\"queued\":0,\"sent\":0,...}`.",
+        "height": 300,
+        "width": 420
+      },
+      "id": "note-1",
+      "name": "Read me",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-120, -140]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "trigger-1",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [360, 60]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://YOUR-APP.vercel.app/api/stays/cron",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-cron-secret",
+              "value": "PASTE_AUTOMATION_CRON_SECRET"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "http-1",
+      "name": "Call villa app",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 60],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ok-check",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-1",
+      "name": "Did it work?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [840, 60]
+    },
+    {
+      "parameters": {
+        "content": "Not OK: the app did not accept the ping (wrong secret, app down, or a scheduler error).\nConnect an email / Telegram / WhatsApp node here if you want to be told.\n401 = wrong secret, 503 = AUTOMATION_CRON_SECRET not set on Vercel.",
+        "height": 150,
+        "width": 330
+      },
+      "id": "note-2",
+      "name": "On failure",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1060, 160]
+    }
+  ],
+  "connections": {
+    "Every minute": {
+      "main": [[{ "node": "Call villa app", "type": "main", "index": 0 }]]
+    },
+    "Call villa app": {
+      "main": [[{ "node": "Did it work?", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "active": false
+}

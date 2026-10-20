@@ -122,8 +122,6 @@ export function missingPropertyDetail(key: MessageKey, property: PropertyRow | u
   const need: Partial<Record<MessageKey, keyof PropertyRow>> = {
     arrival_info: 'address',
     access_details: 'access_instructions',
-    arrival_check: 'caretaker_phone',
-    checkout_reminder: 'caretaker_phone',
     review_request: 'review_url',
   }
   const field = need[key]
@@ -135,7 +133,6 @@ export function missingPropertyDetail(key: MessageKey, property: PropertyRow | u
 const FIELD_LABEL: Record<string, string> = {
   address: 'the address',
   access_instructions: 'the WiFi and lock / gate details',
-  caretaker_phone: "the caretaker's phone number",
   review_url: 'the review link',
 }
 

@@ -7,6 +7,8 @@ import { logStayMessage, sendStayWhatsApp, type StayTransport } from './send'
 import { DEFAULT_TEMPLATES, firstName, renderTemplate } from './templates'
 import { buildValues } from './scheduler'
 import { villaModeOn } from './villa-mode'
+import { CARETAKER_REPLY, FOOD_PROMPT, FOOD_THANKS, isGreeting, isMenuNumber, menuIsFresh, menuText, parseMenuChoice, type MenuChoice } from '../menu/logic'
+import { stayFormUrl } from '../server'
 
 // Replies from guests (PDR 7.2). Runs at the top of the inbound handler, and
 // only does anything for numbers on the allow-list.
@@ -29,8 +31,8 @@ function siteUrlOf(requestUrl: string): string {
 
 export function parseInboundCommand(text: string): StayInboundCommand {
   const t = (text ?? '').trim().toLowerCase().replace(/[.!\s]+$/g, '')
-  if (t === 'ready' || t === '1') return 'ready'
-  if (t === '2') return 'access'
+  if (t === 'ready') return 'ready'
+  if (t === 'wifi' || t === 'access' || t === 'access details') return 'access'
   return 'other'
 }
 
@@ -116,7 +118,118 @@ export async function handleStayInbound(
   const command = parseInboundCommand(args.text)
   const who = `${stay.stay_ref} (${firstName(full.guest_name)})`
 
-  if (command === 'ready') {
+  // ---- The guest's WhatsApp menu --------------------------------------------------------
+  const reply = (text: string, key: string) =>
+    sendStayWhatsApp(db, {
+      accountId: args.accountId,
+      stayId: stay.id,
+      phone: full.guest_phone,
+      guestName: full.guest_name,
+      messageKey: key,
+      text,
+      enforceWindow: false,
+      kind: 'reply',
+      now,
+      transport: args.transport,
+    })
+  const setMenu = async (state: 'main' | 'food' | null) => {
+    if (!args.conversationId) return
+    await db.from('conversations').update({ guest_menu_state: state, guest_menu_at: state ? now.toISOString() : null }).eq('id', args.conversationId)
+  }
+  let menuState: string | null = null
+  let menuAt: string | null = null
+  if (args.conversationId) {
+    const { data: c } = await db.from('conversations').select('guest_menu_state, guest_menu_at').eq('id', args.conversationId).maybeSingle()
+    menuState = (c?.guest_menu_state as string | null) ?? null
+    menuAt = (c?.guest_menu_at as string | null) ?? null
+  }
+  const open = menuIsFresh(menuAt, now) ? menuState : null
+  const handledMenu = { registered: true, handled: true, suppressAutomation: false } as const
+  const logMenu = (key: string, reason?: string) =>
+    logStayMessage(db, { accountId: args.accountId, stayId: stay.id, messageKey: key, direction: 'in', outcome: 'inbound_handled', reason, phone: args.phone })
+
+  const showMenu = async () => {
+    const { data: prop } = await db.from('properties').select('name').eq('id', full.property_id).maybeSingle()
+    await reply(menuText(firstName(full.guest_name), (prop?.name as string | undefined) ?? ''), 'menu')
+    await setMenu('main')
+    await logMenu('inbound_menu')
+    return handledMenu
+  }
+
+  if (isGreeting(args.text)) return showMenu()
+
+  if (open === 'food' && args.text.trim() && parseMenuChoice(args.text) === null) {
+    // The next message after the food question is the request itself: the caretaker gets it.
+    await setMenu(null)
+    if (args.conversationId) {
+      await openEscalation(db, {
+        accountId: args.accountId,
+        conversationId: args.conversationId,
+        stayId: stay.id,
+        label: who,
+        preview: `🍽️ Food request: ${args.text.trim()}`,
+        messageId: args.messageId,
+        siteUrl: siteUrlOf(args.requestUrl),
+        now,
+        report,
+      })
+    } else {
+      await notifyStaff(db, args.accountId, `Food request: ${who}`, args.text.trim().slice(0, 300), { includeCaretakers: true })
+    }
+    await reply(FOOD_THANKS, 'menu_food_thanks')
+    await logMenu('inbound_food')
+    return { ...handledMenu, escalation }
+  }
+
+  let choice: MenuChoice | null = null
+  if (open === 'main') choice = parseMenuChoice(args.text)
+  else if (isMenuNumber(args.text)) return showMenu() // a bare number with no menu open: show the menu
+
+  if (choice === 'form') {
+    const { data: gs } = await db.from('stay_guests').select('is_adult, id_verified_at').eq('stay_id', stay.id)
+    const adults = (gs ?? []).filter((g: { is_adult: boolean }) => g.is_adult)
+    const approved = adults.filter((g: { id_verified_at: string | null }) => !!g.id_verified_at).length
+    const status =
+      full.form_status !== 'submitted'
+        ? 'Your form has not been submitted yet.'
+        : adults.length > 0 && approved === adults.length
+          ? 'Your form is submitted and all IDs are approved ✅'
+          : `Your form is submitted. IDs approved: ${approved} of ${adults.length}. If we asked you to upload an ID again, open the link and redo only that guest.`
+    await reply(`${status}\n${stayFormUrl(args.requestUrl, full.form_token)}`, 'menu_form')
+    await setMenu(null)
+    await logMenu('inbound_form')
+    return handledMenu
+  }
+  if (choice === 'caretaker') {
+    await setMenu(null)
+    if (args.conversationId) {
+      await openEscalation(db, {
+        accountId: args.accountId,
+        conversationId: args.conversationId,
+        stayId: stay.id,
+        label: who,
+        preview: 'The guest asked to be connected with the caretaker.',
+        messageId: args.messageId,
+        siteUrl: siteUrlOf(args.requestUrl),
+        now,
+        report,
+      })
+    } else {
+      await notifyStaff(db, args.accountId, `Guest wants the caretaker: ${who}`, 'Open the inbox to reply.', { includeCaretakers: true })
+    }
+    await reply(CARETAKER_REPLY, 'menu_caretaker')
+    await logMenu('inbound_caretaker')
+    return { ...handledMenu, escalation }
+  }
+  if (choice === 'food') {
+    await reply(FOOD_PROMPT, 'menu_food')
+    await setMenu('food')
+    await logMenu('inbound_food_ask')
+    return handledMenu
+  }
+  if (choice) await setMenu(null)
+
+  if (command === 'ready' || choice === 'ready') {
     if (!full.on_the_way_at) {
       await db.from('stays').update({ on_the_way_at: now.toISOString() }).eq('id', stay.id)
     }
@@ -127,7 +240,7 @@ export async function handleStayInbound(
     return { registered: true, handled: true, suppressAutomation: false }
   }
 
-  if (command === 'access') {
+  if (command === 'access' || choice === 'access') {
     const { data: guests } = await db.from('stay_guests').select('is_adult, id_verified_at').eq('stay_id', stay.id)
     if (!allAdultIdsVerified(guests ?? [])) {
       await notifyStaff(db, args.accountId, `Guest asked for access details: ${who}`, 'IDs are not all verified yet, so nothing was sent. Verify the IDs or reply by hand.', { includeCaretakers: true })

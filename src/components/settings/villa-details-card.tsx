@@ -77,7 +77,6 @@ export function VillaDetailsCard() {
         {field('Map link', 'A Google Maps link.', <Input className="min-h-11" inputMode="url" value={d.map_url} onChange={(e) => set({ map_url: e.target.value })} />)}
         {field('Directions', 'Optional: landmarks, parking.', <textarea className={area} value={d.directions} onChange={(e) => set({ directions: e.target.value })} />)}
         {field('WiFi and lock / gate details', 'Sent on the check-in morning, only after every adult ID is approved. Include the WiFi name and password and how to open the gate and door.', <textarea className={`${area} min-h-32`} value={d.access_instructions} onChange={(e) => set({ access_instructions: e.target.value })} />)}
-        {field("Caretaker's phone", 'With country code, e.g. 919876543210. Shown to the guest to call.', <Input className="min-h-11" inputMode="numeric" placeholder="919876543210" value={d.caretaker_phone} onChange={(e) => set({ caretaker_phone: e.target.value })} />)}
         <div className="grid grid-cols-2 gap-3">
           {field('Check-in time', null, <Input className="min-h-11" type="time" value={d.default_checkin_time} onChange={(e) => set({ default_checkin_time: e.target.value })} />)}
           {field('Check-out time', null, <Input className="min-h-11" type="time" value={d.default_checkout_time} onChange={(e) => set({ default_checkout_time: e.target.value })} />)}

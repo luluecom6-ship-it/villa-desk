@@ -35,12 +35,12 @@ export const DEFAULT_TEMPLATES: Record<MessageKey, string> = {
   arrival_info:
     'Hello {guest_first_name}, we look forward to hosting you tomorrow. Address: {address}\nMap: {map_url}\n{directions}\nCheck-in from {checkin_time}. When you set off, reply READY.',
   access_details:
-    'Good morning {guest_first_name}! Here is how to get in: {access_instructions}\nIf you need anything, call the caretaker on {caretaker_phone}.',
+    'Good morning {guest_first_name}! Here is how to get in: {access_instructions}\nIf you need anything, reply *hi* here to reach the caretaker.',
   owner_alert: 'Registration still incomplete on arrival day: {stay_ref} ({guest_first_name}).',
   arrival_check:
-    'Hello {guest_first_name}, we hope you have settled in. Is everything fine at the villa? Reply here or call {caretaker_phone} if you need anything.',
+    'Hello {guest_first_name}, we hope you have settled in. Is everything fine at the villa? Reply here, or write *hi* for options, if you need anything.',
   checkout_reminder:
-    'Hello {guest_first_name}, a reminder that check-out is tomorrow by {checkout_time}. Please call the caretaker on {caretaker_phone} about 20 minutes before you leave so we can inspect and return your keys. Any security deposit is processed within {refund_days} working days.',
+    'Hello {guest_first_name}, a reminder that check-out is tomorrow by {checkout_time}. Please tell us here (write *hi* and choose the caretaker) about 20 minutes before you leave so we can inspect and return your keys. Any security deposit is processed within {refund_days} working days.',
   review_request:
     'Thank you for staying with us, {guest_first_name}! We would love your feedback: {review_url}',
 }
