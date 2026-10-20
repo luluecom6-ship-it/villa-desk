@@ -2902,7 +2902,9 @@
       "reviewApproved": "Approved",
       "reviewRejected": "Rejected",
       "reviewReason": "Reason: {reason}",
-      "reviewBy": "By {name}"
+      "reviewBy": "By {name}",
+      "markCheckedOut": "Mark as checked out",
+      "checkedOutHelp": "Use this when the guest has left. The record is kept and the mobile number is free for a new booking."
     },
     "cancel": {
       "title": "Cancel this stay?",
@@ -2924,7 +2926,8 @@
       "idRejected": "ID rejected, guest can resubmit",
       "uploadFailed": "Could not upload the ID file",
       "idUploaded": "ID file saved. It needs review again.",
-      "resent": "Message sent to the guest again."
+      "resent": "Message sent to the guest again.",
+      "checkedOut": "Marked as checked out"
     },
     "errors": {
       "invalidJson": "Invalid request body",

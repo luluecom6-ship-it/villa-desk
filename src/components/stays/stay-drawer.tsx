@@ -67,6 +67,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [phoneDraft, setPhoneDraft] = useState('')
   const [copied, setCopied] = useState(false)
   const [viewer, setViewer] = useState<{ url: string; contentType: string; label: string } | null>(null)
@@ -201,6 +202,26 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
   }
 
   const stay = detail?.stay
+  const canCheckout = canIds && !!stay && (stay.status === 'registered' || stay.status === 'checked_in')
+  async function markCheckedOut() {
+    if (!stayId) return
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/stays/${stayId}/checkout`, { method: 'POST' })
+      if (!res.ok) {
+        toast.error(t('toast.saveFailed'))
+        return
+      }
+      toast.success(t('toast.checkedOut'))
+      setCheckoutOpen(false)
+      await load()
+      onChanged()
+    } catch {
+      toast.error(t('toast.saveFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
   const canEdit = isAdmin && !!stay && stay.status !== 'cancelled' && stay.status !== 'checked_out'
 
   async function copyLink() {
@@ -564,6 +585,15 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                   </Section>
                 )}
 
+                {canCheckout && (
+                  <div className="border-t border-border pt-4">
+                    <Button variant="outline" onClick={() => setCheckoutOpen(true)} disabled={busy}>
+                      {t('drawer.markCheckedOut')}
+                    </Button>
+                    <p className="mt-2 text-xs text-muted-foreground">{t('drawer.checkedOutHelp')}</p>
+                  </div>
+                )}
+
                 {canEdit && (
                   <div className="border-t border-border pt-4">
                     <Button variant="destructive" onClick={() => setCancelOpen(true)}>
@@ -614,6 +644,19 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
               // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
               <img src={viewer.url} alt={viewer.label} className="max-h-[70vh] w-full rounded-md object-contain" />
             ))}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('drawer.markCheckedOut')}</DialogTitle>
+            <DialogDescription>{t('drawer.checkedOutHelp')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheckoutOpen(false)}>{t('cancel.keep')}</Button>
+            <Button onClick={markCheckedOut} disabled={busy}>{t('drawer.markCheckedOut')}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -54,6 +54,12 @@ export function judge(
 
   switch (key) {
     case 'form_link':
+      // The first form link always goes out on registration, even for a same-day or
+      // already-started stay (the guest still has to fill the form); only a finished stay skips it.
+      if (formDone) return { verdict: 'skip', reason: 'form_submitted' }
+      if (now >= checkout) return { verdict: 'skip', reason: 'stay_over' }
+      return { verdict: 'send', reason: 'form_pending' }
+
     case 'form_reminder_3d':
     case 'form_reminder_2d':
     case 'form_reminder_1d':

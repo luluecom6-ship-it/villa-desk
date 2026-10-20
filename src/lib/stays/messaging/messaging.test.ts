@@ -64,7 +64,10 @@ describe('conditions', () => {
   it('form reminders need a pending form', () => {
     expect(judge('form_reminder_2d', base, [], before).verdict).toBe('send')
     expect(judge('form_reminder_2d', { ...base, form_status: 'submitted' }, [], before).verdict).toBe('skip')
-    expect(judge('form_link', base, [], ist('2026-11-10 15:00')).verdict).toBe('skip')
+    // the first link still goes out for a stay that has already started, until check-out
+    expect(judge('form_link', base, [], ist('2026-11-10 15:00')).verdict).toBe('send')
+    expect(judge('form_link', base, [], ist('2026-11-12 12:00')).verdict).toBe('skip')
+    expect(judge('form_reminder_1d', base, [], ist('2026-11-10 15:00')).verdict).toBe('skip')
   })
   it('arrival info waits for the form, never sends after arrival', () => {
     const day = ist('2026-11-09 10:00')
