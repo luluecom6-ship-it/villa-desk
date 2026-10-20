@@ -80,7 +80,7 @@ describe('food ordering over WhatsApp', () => {
     expect(order).toMatchObject({ status: 'pending', total: 440, stay_id: 's1' })
     expect(order.items).toEqual([{ name: 'Idli', price: 100, qty: 1 }, { name: 'Chicken Briyani', price: 170, qty: 2 }])
     expect(toGuest().at(-1)).toContain('Total: INR 440')
-    expect(toAgent().some((t) => t.includes('Food order F') && t.includes('*ok*'))).toBe(true)
+    expect(toAgent().some((t) => t.includes('Food order F') && t.includes('*confirm*'))).toBe(true)
   })
 
   it('a wrong number asks again and keeps waiting for the order', async () => {

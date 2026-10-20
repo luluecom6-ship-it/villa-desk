@@ -50,14 +50,15 @@ describe('what the agent receives', () => {
 })
 
 describe('orderAnswerFromReply', () => {
-  it('reads a bare ok / yes / thumbs up as an approval', () => {
-    for (const t of ['ok', 'OK', 'Okay.', 'yes', 'confirm', '👍', ' ok! ']) expect(orderAnswerFromReply(t)).toEqual({ kind: 'approve' })
+  it('reads confirm / approve as an approval', () => {
+    for (const t of ['confirm', 'Confirm', 'APPROVE', 'approved.', ' confirm! ']) expect(orderAnswerFromReply(t)).toEqual({ kind: 'approve' })
   })
-  it('reads a bare no, or decline with a reason, as a decline', () => {
-    expect(orderAnswerFromReply('no')).toEqual({ kind: 'decline', reason: '' })
-    expect(orderAnswerFromReply('decline kitchen is closed')).toEqual({ kind: 'decline', reason: 'kitchen is closed' })
+  it('reads decline, with or without a reason, as a decline', () => {
+    expect(orderAnswerFromReply('decline')).toEqual({ kind: 'decline', reason: '' })
+    expect(orderAnswerFromReply('Decline kitchen is closed')).toEqual({ kind: 'decline', reason: 'kitchen is closed' })
+    expect(orderAnswerFromReply('reject: out of stock')).toEqual({ kind: 'decline', reason: 'out of stock' })
   })
-  it('leaves ordinary sentences for the guest', () => {
-    for (const t of ['ok, coming in 10 minutes', 'no problem sir', 'yes parking is free', 'okay we will bring it', '']) expect(orderAnswerFromReply(t)).toBeNull()
+  it('leaves everyday words and sentences for the guest', () => {
+    for (const t of ['ok', 'okay', 'yes', 'no', 'no problem sir', '👍', 'ok, coming in 10 minutes', 'we confirm your table is ready', '']) expect(orderAnswerFromReply(t)).toBeNull()
   })
 })

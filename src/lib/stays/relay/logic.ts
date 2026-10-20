@@ -74,15 +74,15 @@ export function parseAgentMessage(raw: string | null | undefined): AgentCommand 
 }
 
 /**
- * A plain "ok" / "yes" / "👍" (or a bare "no") written to a guest who has a food order waiting is an answer to
- * that order, not a message for the guest. The caller checks that an order is really waiting.
+ * The words "confirm" / "approve" (or "decline", with an optional reason) written to a guest who has a food order
+ * waiting answer that order. Everyday words like "ok" or "yes" are NOT answers: they go to the guest. The caller
+ * checks that an order is really waiting.
  */
 export function orderAnswerFromReply(raw: string | null | undefined): { kind: 'approve' } | { kind: 'decline'; reason: string } | null {
   const text = (raw ?? '').trim()
-  if (/^(ok|okay|yes|y|confirm|confirmed|approve|approved|done|accept|accepted|👍|✅)[\s.!]*$/iu.test(text)) return { kind: 'approve' }
-  if (/^(no|decline|declined|reject|rejected|sorry|❌)[\s.!]*$/iu.test(text)) return { kind: 'decline', reason: '' }
-  const withReason = /^(decline|reject)\b[\s:,-]*([\s\S]+)$/iu.exec(text)
-  if (withReason) return { kind: 'decline', reason: withReason[2].trim() }
+  if (/^(confirm|confirmed|approve|approved)[\s.!]*$/iu.test(text)) return { kind: 'approve' }
+  const d = /^(decline|declined|reject|rejected)\b[\s:,-]*([\s\S]*)$/iu.exec(text)
+  if (d) return { kind: 'decline', reason: d[2].trim() }
   return null
 }
 
@@ -90,8 +90,8 @@ export const HELP_TEXT = [
   '*How to answer guests*',
   "Swipe-reply to a guest's message (or start with its number, e.g. #482) and type your answer. It goes to the guest from the villa number.",
   '',
-  'ok (or /ok)  confirm the guest\'s food order',
-  '/no reason  (or just no) decline the food order (the reason is sent to the guest)',
+  'confirm  (or approve) the guest\'s food order',
+  'decline reason  decline the food order (the reason is sent to the guest)',
   '/close  finish the chat (stop reminders)',
   '/transfer Sara  give the chat to another person',
   '/info  guest and stay details',
