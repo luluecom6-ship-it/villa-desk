@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- rows from untyped supabase selects */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import QRCode from 'qrcode'
+import { buildMediaPath } from '@/lib/storage/upload-media'
 import { openEscalation } from '../escalation/server'
 import { sendStayWhatsApp, type SendOutcome, type StayTransport } from '../messaging/send'
 import {
@@ -8,6 +10,8 @@ import {
   guestOrderConfirmed,
   guestOrderDeclined,
   guestOrderReceived,
+  guestPaymentText,
+  buildUpiUri,
   menuListText,
   type MenuItem,
   type OrderLine,
@@ -130,7 +134,45 @@ export async function decideOrder(
       const text = args.decision === 'confirmed' ? guestOrderConfirmed(lines, Number(order.total)) : guestOrderDeclined(reason)
       const r = await send(db, args.accountId, stay as StayRef, args.decision === 'confirmed' ? 'food_order_confirmed' : 'food_order_declined', text, { now, transport: args.transport })
       outcome = r.outcome
+      if (args.decision === 'confirmed') {
+        await sendUpiQr(db, { accountId: args.accountId, stay: stay as StayRef, orderId: order.id, orderNo: Number(order.order_no), total: Number(order.total), now, transport: args.transport }).catch((e) =>
+          console.error('[food] UPI QR failed:', e instanceof Error ? e.message : 'error'),
+        )
+      }
     }
   }
   return { ok: true, orderNo: Number(order.order_no), guestMessage: outcome }
+}
+
+
+/** After a confirmation: send the guest a UPI QR for the total (if the owner saved a UPI ID and left this on). */
+export async function sendUpiQr(
+  db: SupabaseClient,
+  args: { accountId: string; stay: StayRef; orderId: string; orderNo: number; total: number; now?: Date; transport?: StayTransport },
+): Promise<'sent' | 'not_configured' | 'failed'> {
+  const { data: props } = await db.from('properties').select('upi_id, upi_payee_name, name, food_send_upi_qr').eq('account_id', args.accountId).order('created_at', { ascending: true }).limit(1)
+  const p = props?.[0] as any
+  if (!p?.upi_id || p.food_send_upi_qr === false || !(args.total > 0)) return 'not_configured'
+  const uri = buildUpiUri({ upiId: p.upi_id, payeeName: p.upi_payee_name || p.name || 'Villa', amount: args.total, orderNo: args.orderNo })
+  const png = await QRCode.toBuffer(uri, { type: 'png', width: 512, margin: 2, errorCorrectionLevel: 'M' })
+  const path = buildMediaPath(args.accountId, `upi-F${args.orderNo}.png`, Date.now(), 'food')
+  const storage = db.storage.from('chat-media')
+  const { error } = await storage.upload(path, new Uint8Array(png), { contentType: 'image/png', cacheControl: '3600', upsert: false })
+  if (error) return 'failed'
+  const url = storage.getPublicUrl(path).data.publicUrl
+  const r = await send(db, args.accountId, args.stay, 'food_order_payment', guestPaymentText({ orderNo: args.orderNo, total: args.total, upiId: p.upi_id }), { now: args.now, transport: args.transport, media: { url, kind: 'image' } })
+  if (r.outcome !== 'sent') return 'failed'
+  await db.from('food_orders').update({ qr_sent_at: (args.now ?? new Date()).toISOString() }).eq('id', args.orderId)
+  return 'sent'
+}
+
+/** Mark an order paid by hand (caretaker and above). Idempotent. */
+export async function markOrderPaid(db: SupabaseClient, args: { accountId: string; orderId: string; byName: string | null; now?: Date }): Promise<'ok' | 'not_found' | 'not_confirmed'> {
+  const { data } = await db.from('food_orders').select('id, status, payment_status').eq('id', args.orderId).eq('account_id', args.accountId).maybeSingle()
+  const o = data as any
+  if (!o) return 'not_found'
+  if (o.status !== 'confirmed') return 'not_confirmed'
+  if (o.payment_status === 'paid') return 'ok'
+  await db.from('food_orders').update({ payment_status: 'paid', paid_at: (args.now ?? new Date()).toISOString(), paid_by_name: args.byName }).eq('id', args.orderId)
+  return 'ok'
 }

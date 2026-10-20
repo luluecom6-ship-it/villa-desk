@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- in-memory db + mocks */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeDb } from '../messaging/test-support'
-import { parseOrder, menuListText, type MenuItem } from './logic'
+import { parseOrder, menuListText, buildUpiUri, cleanUpiId, type MenuItem } from './logic'
 
 const m = vi.hoisted(() => ({ sendText: vi.fn(), transport: vi.fn() }))
 vi.mock('@/lib/evolution/server', () => ({ loadEvolutionConfig: async () => ({ account_id: 'a1', state: 'open' }), connFromRow: () => ({}) }))
@@ -10,7 +10,7 @@ vi.mock('@/lib/evolution/client', () => ({ sendText: m.sendText, sendMedia: vi.f
 vi.mock('@/lib/whatsapp/send-message', () => ({ sendMessageToConversation: vi.fn() }))
 
 import { handleStayInbound } from '../messaging/inbound'
-import { decideOrder } from './server'
+import { decideOrder, markOrderPaid } from './server'
 
 const MENU: MenuItem[] = [
   { id: 'i1', name: 'Idli', price: 100 },
@@ -121,5 +121,58 @@ describe('food ordering over WhatsApp', () => {
     expect(r.ok).toBe(true)
     expect(toGuest().at(-1)).toContain('kitchen is closed')
     expect(db.tables.food_orders[0].status).toBe('declined')
+  })
+
+  describe('UPI payment', () => {
+    const uploads: string[] = []
+    beforeEach(() => {
+      uploads.length = 0
+      db.storage = { from: () => ({ upload: async (path: string) => { uploads.push(path); return { error: null } }, getPublicUrl: (path: string) => ({ data: { publicUrl: `https://files.test/${path}` } }) }) }
+    })
+    const placeAndConfirm = async () => {
+      await say('hi'); await say('4'); await say('1')
+      return decideOrder(db, { accountId: 'a1', orderId: db.tables.food_orders[0].id, decision: 'confirmed', byUserId: 'care', byName: 'Ravi', transport: m.transport as any })
+    }
+    it('confirming sends the guest a QR picture for the total when a UPI ID is saved', async () => {
+      db.tables.properties[0].upi_id = 'mahinoor@okhdfcbank'
+      await placeAndConfirm()
+      expect(uploads).toHaveLength(1)
+      const last = m.transport.mock.calls.at(-1)![0]
+      expect(last.media?.url).toContain('https://files.test/')
+      expect(last.text).toContain('Pay INR 100')
+      expect(last.text).toContain('mahinoor@okhdfcbank')
+      expect(db.tables.food_orders[0].qr_sent_at).toBeTruthy()
+    })
+    it('sends no QR without a UPI ID, when switched off, or when declined', async () => {
+      await placeAndConfirm()
+      expect(uploads).toHaveLength(0)
+      db.tables.properties[0].upi_id = 'mahinoor@okhdfcbank'
+      db.tables.properties[0].food_send_upi_qr = false
+      db.tables.food_orders = []
+      await placeAndConfirm()
+      expect(uploads).toHaveLength(0)
+    })
+    it('marks a confirmed order paid, once, and refuses a pending one', async () => {
+      await say('hi'); await say('4'); await say('1')
+      const id = db.tables.food_orders[0].id
+      expect(await markOrderPaid(db, { accountId: 'a1', orderId: id, byName: 'Ravi' })).toBe('not_confirmed')
+      await decideOrder(db, { accountId: 'a1', orderId: id, decision: 'confirmed', byUserId: 'care', byName: 'Ravi', transport: m.transport as any })
+      expect(await markOrderPaid(db, { accountId: 'a1', orderId: id, byName: 'Ravi' })).toBe('ok')
+      expect(db.tables.food_orders[0]).toMatchObject({ payment_status: 'paid', paid_by_name: 'Ravi' })
+      expect(await markOrderPaid(db, { accountId: 'a1', orderId: id, byName: 'Other' })).toBe('ok')
+      expect(db.tables.food_orders[0].paid_by_name).toBe('Ravi')
+    })
+  })
+})
+
+describe('UPI helpers', () => {
+  it('accepts normal UPI IDs and rejects junk', () => {
+    expect(cleanUpiId(' name.x@okhdfcbank ')).toBe('name.x@okhdfcbank')
+    expect(cleanUpiId('9876543210@paytm')).toBe('9876543210@paytm')
+    for (const bad of ['', 'nobank', 'a@b', 'x y@bank', '@bank', 'https://evil.test']) expect(cleanUpiId(bad)).toBeNull()
+  })
+  it('builds the payment link with the exact amount and the order note', () => {
+    const uri = buildUpiUri({ upiId: 'villa@okaxis', payeeName: 'Mahinoor Stays', amount: 245, orderNo: 12 })
+    expect(uri).toBe('upi://pay?pa=villa%40okaxis&pn=Mahinoor%20Stays&am=245.00&cu=INR&tn=Food%20order%20F12')
   })
 })

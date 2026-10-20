@@ -78,3 +78,30 @@ export function caretakerOrderText(orderNo: number, lines: OrderLine[], total: n
 export const FOOD_NOT_READY = 'Our food menu is not ready yet. Please write *hi* and choose the caretaker, and they will help you.'
 export const FOOD_RETRY = 'Please reply with numbers from the menu, for example *1, 3* or *2x2*.'
 export const FOOD_NOTE_THANKS = 'Thank you! We have passed your note to the caretaker. They will reply here shortly.'
+
+// ---- UPI payment -------------------------------------------------------------------------
+
+/** A UPI address (VPA) such as name@okhdfcbank. */
+export const UPI_ID = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9.-]{1,30}$/
+
+export function cleanUpiId(v: unknown): string | null {
+  const t = typeof v === 'string' ? v.trim() : ''
+  return UPI_ID.test(t) ? t : null
+}
+
+/** The payment link encoded in the QR. Amount in rupees with two decimals; the order number is the note. */
+export function buildUpiUri(args: { upiId: string; payeeName: string; amount: number; orderNo: number }): string {
+  const q = new URLSearchParams({
+    pa: args.upiId,
+    pn: args.payeeName.trim().slice(0, 50) || 'Villa',
+    am: (Math.round(args.amount * 100) / 100).toFixed(2),
+    cu: 'INR',
+    tn: `Food order F${args.orderNo}`,
+  })
+  // URLSearchParams writes spaces as "+"; UPI apps expect %20.
+  return `upi://pay?${q.toString().replace(/\+/g, '%20')}`
+}
+
+export function guestPaymentText(args: { orderNo: number; total: number; upiId: string }): string {
+  return `💳 *Pay ${inr(args.total)}* for order F${args.orderNo}\nScan this QR with any UPI app (GPay, PhonePe, Paytm), or pay to UPI ID: ${args.upiId}\nAfter paying, please send the screenshot here.`
+}

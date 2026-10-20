@@ -20,6 +20,9 @@ interface Order {
   decidedByName: string | null
   declineReason: string | null
   createdAt: string
+  paymentStatus: 'unpaid' | 'paid'
+  paidByName: string | null
+  qrSent: boolean
 }
 
 const inr = (n: number) => `INR ${Number.isInteger(n) ? n : n.toFixed(2)}`
@@ -58,6 +61,16 @@ export default function FoodPage() {
     } finally { setBusy(null) }
   }
 
+  async function markPaid(o: Order) {
+    setBusy(o.id)
+    try {
+      const res = await fetch('/api/food/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: o.id, paid: true }) })
+      if (!res.ok) toast.error('Could not mark it paid.')
+      else toast.success('Marked as paid.')
+      await loadOrders()
+    } finally { setBusy(null) }
+  }
+
   const pending = orders.filter((o) => o.status === 'pending')
   const done = orders.filter((o) => o.status !== 'pending')
 
@@ -87,6 +100,14 @@ export default function FoodPage() {
             <div className="flex items-center justify-between gap-2"><span className="font-medium">F{o.orderNo} · {o.guestName ?? 'Guest'}</span><span className={cn('text-xs font-medium', o.status === 'confirmed' ? 'text-emerald-600' : 'text-red-600')}>{o.status === 'confirmed' ? 'Confirmed' : 'Declined'}{o.decidedByName ? ` by ${o.decidedByName}` : ''}</span></div>
             <div className="text-xs text-muted-foreground">{o.items.map((l) => `${l.qty} × ${l.name}`).join(', ')} · {inr(o.total)} · {when(o.createdAt)}</div>
             {o.declineReason && <div className="text-xs text-muted-foreground">Reason: {o.declineReason}</div>}
+            {o.status === 'confirmed' && (
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className={cn('text-xs font-medium', o.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600')}>
+                  {o.paymentStatus === 'paid' ? `Paid${o.paidByName ? ` (marked by ${o.paidByName})` : ''}` : `Not paid yet${o.qrSent ? ' · UPI QR sent' : ''}`}
+                </span>
+                {o.paymentStatus !== 'paid' && <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => void markPaid(o)}>Mark paid</Button>}
+              </div>
+            )}
           </div>
         ))}
       </section>

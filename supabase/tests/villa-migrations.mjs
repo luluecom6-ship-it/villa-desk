@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66|67)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66|67|68)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -593,6 +593,13 @@ await rpc(sF1.form_token, formFor(sF1, rv, {
 const f1 = await one(`SELECT alternate_mobile, occupation, emergency_name, emergency_phone FROM stay_guests WHERE stay_id='${sF1.id}' AND role='lead'`);
 ok('lead alternate mobile, occupation and emergency contact are stored', f1.alternate_mobile === '919800000001' && f1.occupation === 'Engineer' && f1.emergency_name === 'Mother' && f1.emergency_phone === '919800000002', JSON.stringify(f1));
 ok('an extra guest mobile is stored', (await one(`SELECT mobile FROM stay_guests WHERE stay_id='${sF1.id}' AND role='occupant'`)).mobile === '919800000003');
+
+// ---- Migration 068: food UPI payment ----------------------------------------------------
+await db.exec(`INSERT INTO food_orders(account_id, items, total, status, decided_at) VALUES ('${acct}','[]',100,'confirmed',now())`);
+await rejects('paid needs a paid time', `UPDATE food_orders SET payment_status='paid'`, /food_orders_payment_check|check/i);
+await db.exec(`UPDATE food_orders SET payment_status='paid', paid_at=now()`);
+ok('an order can be marked paid', (await one(`SELECT payment_status FROM food_orders LIMIT 1`)).payment_status === 'paid');
+await rejects('an unknown payment status is refused', `UPDATE food_orders SET payment_status='refunded', paid_at=NULL`, /food_orders_payment_check|check/i);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
-import { decideOrder } from '@/lib/stays/food/server'
+import { decideOrder, markOrderPaid } from '@/lib/stays/food/server'
 
 export const maxDuration = 60
 
@@ -15,7 +15,7 @@ export async function GET() {
     const ctx = await requireRole('agent')
     const { data } = await supabaseAdmin()
       .from('food_orders')
-      .select('id, order_no, guest_name, items, total, status, decided_by_name, decided_at, decline_reason, created_at')
+      .select('id, order_no, guest_name, items, total, status, decided_by_name, decided_at, decline_reason, created_at, payment_status, paid_at, paid_by_name, qr_sent_at')
       .eq('account_id', ctx.accountId)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -23,6 +23,7 @@ export async function GET() {
       orders: (data ?? []).map((o) => ({
         id: o.id, orderNo: o.order_no, guestName: o.guest_name, items: o.items, total: Number(o.total), status: o.status,
         decidedByName: o.decided_by_name, decidedAt: o.decided_at, declineReason: o.decline_reason, createdAt: o.created_at,
+        paymentStatus: o.payment_status, paidAt: o.paid_at, paidByName: o.paid_by_name, qrSent: !!o.qr_sent_at,
       })),
     })
   } catch (err) {
@@ -33,7 +34,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const ctx = await requireRole('agent')
-    const b = (await request.json().catch(() => null)) as { id?: unknown; decision?: unknown; reason?: unknown } | null
+    const b = (await request.json().catch(() => null)) as { id?: unknown; decision?: unknown; reason?: unknown; paid?: unknown } | null
+    if (b && b.paid === true && typeof b.id === 'string' && UUID.test(b.id)) {
+      const db = supabaseAdmin()
+      const { data: prof } = await db.from('profiles').select('full_name, email').eq('user_id', ctx.userId).eq('account_id', ctx.accountId).maybeSingle()
+      const r = await markOrderPaid(db, { accountId: ctx.accountId, orderId: b.id, byName: (prof?.full_name as string | null) || (prof?.email as string | null) || null })
+      return r === 'ok' ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, error: r }, { status: r === 'not_found' ? 404 : 409 })
+    }
     if (!b || typeof b.id !== 'string' || !UUID.test(b.id) || (b.decision !== 'confirmed' && b.decision !== 'declined')) {
       return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })
     }

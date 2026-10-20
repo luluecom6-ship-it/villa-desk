@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { FoodTabs } from '@/components/food/food-tabs'
+import { PaymentCard } from '@/components/food/payment-card'
 
 // Food menu settings: the dishes, prices (INR) and the menu picture guests receive.
 interface Item { id: string | null; name: string; price: string; active: boolean }
@@ -75,6 +76,8 @@ export default function FoodMenuPage() {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 p-4 pb-24 md:p-6">
       <FoodTabs active="menu" />
+
+      <PaymentCard />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Menu picture</h2>
