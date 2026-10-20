@@ -67,6 +67,10 @@ const EMPTY_LEAD: GuestFormLead = {
   visa_type: '',
   visa_expiry: '',
   arrived_in_india_on: '',
+  alternate_mobile: '',
+  occupation: '',
+  emergency_name: '',
+  emergency_phone: '',
 }
 const EMPTY_ARRIVAL: GuestFormInput['arrival'] = {
   expected_arrival_time: '',
@@ -122,6 +126,7 @@ export function GuestForm({ token }: { token: string }) {
           age: String(o.age ?? ''),
           id_type: o.id_type,
           id_last4: o.id_last4,
+          mobile: o.mobile ?? '',
         })),
       )
       setSlots({})
@@ -427,6 +432,30 @@ export function GuestForm({ token }: { token: string }) {
             <FieldError path="lead.email" />
           </Field>
 
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label={t('lead.alternateMobile')}>
+              <Input className={INPUT_CLASS} type="tel" inputMode="tel" autoComplete="tel" value={lead.alternate_mobile}
+                onChange={(e) => setLeadField('alternate_mobile', e.target.value)} onBlur={() => touch('lead.alternate_mobile')}
+                aria-invalid={!!err('lead.alternate_mobile')} maxLength={20} />
+              <FieldError path="lead.alternate_mobile" />
+            </Field>
+            <Field label={t('lead.occupation')}>
+              <Input className={INPUT_CLASS} value={lead.occupation} onChange={(e) => setLeadField('occupation', e.target.value)} maxLength={80} />
+              <FieldError path="lead.occupation" />
+            </Field>
+            <Field label={t('lead.emergencyName')}>
+              <Input className={INPUT_CLASS} value={lead.emergency_name} onChange={(e) => setLeadField('emergency_name', e.target.value)}
+                onBlur={() => touch('lead.emergency_name')} aria-invalid={!!err('lead.emergency_name')} maxLength={120} />
+              <FieldError path="lead.emergency_name" />
+            </Field>
+            <Field label={t('lead.emergencyPhone')}>
+              <Input className={INPUT_CLASS} type="tel" inputMode="tel" value={lead.emergency_phone}
+                onChange={(e) => setLeadField('emergency_phone', e.target.value)} onBlur={() => touch('lead.emergency_phone')}
+                aria-invalid={!!err('lead.emergency_phone')} maxLength={20} />
+              <FieldError path="lead.emergency_phone" />
+            </Field>
+          </div>
+
           <Field label={t('lead.nationalityType')}>
             <select
               className={SELECT_CLASS}
@@ -640,6 +669,12 @@ export function GuestForm({ token }: { token: string }) {
                     <FieldError path={`${p}.age`} />
                   </Field>
                 </div>
+                <Field label={t('occupants.mobile')}>
+                  <Input className={INPUT_CLASS} type="tel" inputMode="tel" value={o.mobile ?? ''}
+                    onChange={(e) => setOccupant(i, { mobile: e.target.value })} onBlur={() => touch(`${p}.mobile`)}
+                    aria-invalid={!!err(`${p}.mobile`)} maxLength={20} />
+                  <FieldError path={`${p}.mobile`} />
+                </Field>
 
                 {isAdult ? (
                   <>

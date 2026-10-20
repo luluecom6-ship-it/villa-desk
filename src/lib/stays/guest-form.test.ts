@@ -271,3 +271,41 @@ describe('parseGuestForm', () => {
     expect(parseGuestForm('x', ctx()).ok).toBe(false)
   })
 })
+
+describe('Form 1 extra fields', () => {
+  const ctx: ParseContext = { alreadySigned: true, existingFronts: ['lead'] }
+  const base = (lead: Record<string, unknown> = {}, occ: Record<string, unknown>[] = []) => ({
+    lead: { full_name: 'Asha Rao', address: 'Bengaluru', id_type: 'aadhaar', id_last4: '1234', ...lead },
+    arrival: {},
+    occupants: occ,
+    documents: [],
+    acceptance: {},
+  })
+  it('cleans phone numbers to digits and keeps the optional fields', () => {
+    const r = parseGuestForm(base({ alternate_mobile: '+91 98000-00001', occupation: ' Engineer ', emergency_name: 'Mother', emergency_phone: '(91) 9800000002' }), ctx)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.value.lead).toMatchObject({ alternate_mobile: '919800000001', occupation: 'Engineer', emergency_name: 'Mother', emergency_phone: '919800000002' })
+  })
+  it('is fine when all of them are left empty', () => {
+    expect(parseGuestForm(base(), ctx).ok).toBe(true)
+  })
+  it('rejects bad phones and an emergency name without a number (or the reverse)', () => {
+    const bad = parseGuestForm(base({ alternate_mobile: '12ab' }), ctx)
+    expect(bad.ok).toBe(false)
+    if (!bad.ok) expect(bad.errors['lead.alternate_mobile']).toBe('invalidPhone')
+    const half = parseGuestForm(base({ emergency_name: 'Mother' }), ctx)
+    expect(half.ok).toBe(false)
+    if (!half.ok) expect(half.errors['lead.emergency_phone']).toBe('required')
+    const half2 = parseGuestForm(base({ emergency_phone: '9800000002' }), ctx)
+    if (!half2.ok) expect(half2.errors['lead.emergency_name']).toBe('required')
+  })
+  it('keeps an extra guest mobile and rejects a bad one', () => {
+    const occ = { client_key: 'o1', full_name: 'Friend', age: 8 }
+    const ok = parseGuestForm(base({}, [{ ...occ, mobile: '98000 00003' }]), ctx)
+    expect(ok.ok).toBe(true)
+    if (ok.ok) expect(ok.value.occupants[0].mobile).toBe('9800000003')
+    const bad = parseGuestForm(base({}, [{ ...occ, mobile: 'abc' }]), ctx)
+    expect(bad.ok).toBe(false)
+    if (!bad.ok) expect(bad.errors['occupants.0.mobile']).toBe('invalidPhone')
+  })
+})

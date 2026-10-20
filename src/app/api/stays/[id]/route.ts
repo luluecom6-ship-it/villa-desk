@@ -53,7 +53,7 @@ export async function GET(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) return NextResponse.json({ error: t('errors.notFound') }, { status: 404 })
 
-    const [acceptance, documents, messages, reviews] = await Promise.all([
+    const [acceptance, documents, messages, reviews, contacts] = await Promise.all([
       ctx.supabase
         .from('stay_acceptances')
         .select('typed_name, accepted_at, ip_address, rules_version_id, house_rules_versions(version)')
@@ -82,6 +82,13 @@ export async function GET(
             .eq('stay_id', id)
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as unknown[] }),
+      // Form 1 contact details for each guest (caretakers and above).
+      canSeeIds
+        ? ctx.supabase
+            .from('stay_guests')
+            .select('id, mobile, alternate_mobile, occupation, emergency_name, emergency_phone, email, nationality, address')
+            .eq('stay_id', id)
+        : Promise.resolve({ data: [] as unknown[] }),
     ])
 
     return NextResponse.json({
@@ -93,6 +100,7 @@ export async function GET(
       documents: documents.data ?? [],
       messages: messages.data ?? [],
       reviews: reviews.data ?? [],
+      contacts: contacts.data ?? [],
     })
   } catch (err) {
     return toErrorResponse(err)

@@ -3019,7 +3019,11 @@
       "visaType": "Visa type (optional)",
       "visaExpiry": "Visa expiry (optional)",
       "arrivedInIndia": "Date you arrived in India (optional)",
-      "address": "Home address"
+      "address": "Home address",
+      "alternateMobile": "Alternate mobile (optional)",
+      "occupation": "Occupation (optional)",
+      "emergencyName": "Emergency contact name (optional)",
+      "emergencyPhone": "Emergency contact mobile"
     },
     "arrival": {
       "title": "Your arrival",
@@ -3061,7 +3065,8 @@
       "age": "Age",
       "add": "Add a guest",
       "remove": "Remove",
-      "childNote": "No ID is needed for guests under 18."
+      "childNote": "No ID is needed for guests under 18.",
+      "mobile": "Mobile (optional)"
     },
     "rules": {
       "title": "House rules",
@@ -3133,7 +3138,8 @@
       "passportRequired": "Foreign guests must use a passport.",
       "idPhotoRequired": "A photo of the front of the ID is required.",
       "acceptRules": "Please accept the house rules.",
-      "signatureRequired": "Type your full name to sign."
+      "signatureRequired": "Type your full name to sign.",
+      "invalidPhone": "Enter a valid mobile number (7 to 15 digits)."
     },
     "review": {
       "approved": "Your ID is approved. Nothing more to do for this guest.",

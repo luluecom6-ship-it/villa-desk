@@ -18,6 +18,7 @@ export type GuestFormErrorKey =
   | 'tooLong'
   | 'invalidEmail'
   | 'invalidLast4'
+  | 'invalidPhone'
   | 'invalidTime'
   | 'invalidDate'
   | 'invalidAge'
@@ -41,6 +42,10 @@ export interface GuestFormLead {
   visa_type: string
   visa_expiry: string
   arrived_in_india_on: string
+  alternate_mobile: string
+  occupation: string
+  emergency_name: string
+  emergency_phone: string
 }
 
 export interface GuestFormOccupant {
@@ -52,6 +57,7 @@ export interface GuestFormOccupant {
   age: string | number
   id_type: string
   id_last4: string
+  mobile?: string
 }
 
 export interface GuestFormInput {
@@ -93,6 +99,15 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const LAST4 = /^[0-9A-Za-z]{4}$/
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+const PHONE_DIGITS = /^\d{7,15}$/
+/** Optional phone: digits only after stripping spaces, +, dashes and brackets; 7 to 15 digits. */
+function phone(v: unknown): { value: string; ok: boolean } {
+  const raw = typeof v === 'string' ? v.trim() : ''
+  if (!raw) return { value: '', ok: true }
+  const digits = raw.replace(/[\s()+-]/g, '')
+  return { value: digits, ok: PHONE_DIGITS.test(digits) }
+}
 
 const s = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 
@@ -143,6 +158,17 @@ export function parseGuestForm(raw: unknown, ctx: ParseContext): GuestFormResult
   const visa_type = s(leadIn.visa_type)
   if (visa_type.length > 60) errors['lead.visa_type'] = 'tooLong'
 
+  const alt = phone(leadIn.alternate_mobile)
+  if (!alt.ok) errors['lead.alternate_mobile'] = 'invalidPhone'
+  const occupation = s(leadIn.occupation)
+  if (occupation.length > 80) errors['lead.occupation'] = 'tooLong'
+  const emergencyName = s(leadIn.emergency_name)
+  if (emergencyName.length > 120) errors['lead.emergency_name'] = 'tooLong'
+  const emergencyPhone = phone(leadIn.emergency_phone)
+  if (!emergencyPhone.ok) errors['lead.emergency_phone'] = 'invalidPhone'
+  if (emergencyName && !emergencyPhone.value) errors['lead.emergency_phone'] = 'required'
+  if (emergencyPhone.value && !emergencyName) errors['lead.emergency_name'] = 'required'
+
   // ---- Arrival ----------------------------------------------------------
   const eta = s(arrIn.expected_arrival_time)
   if (eta && !TIME.test(eta)) errors['arrival.expected_arrival_time'] = 'invalidTime'
@@ -183,6 +209,9 @@ export function parseGuestForm(raw: unknown, ctx: ParseContext): GuestFormResult
     const age = Number(ageText)
     if (ageText === '' || !Number.isInteger(age) || age < 0 || age > 120) errors[`${p}.age`] = 'invalidAge'
 
+    const occMobile = phone(o.mobile)
+    if (!occMobile.ok) errors[`${p}.mobile`] = 'invalidPhone'
+
     const adult = Number.isInteger(age) && ageText !== '' && isAdultAge(age)
     let id_type = ''
     let id_last4 = ''
@@ -202,6 +231,7 @@ export function parseGuestForm(raw: unknown, ctx: ParseContext): GuestFormResult
       is_adult: adult,
       id_type,
       id_last4,
+      mobile: occMobile.value,
     })
   })
 
@@ -255,6 +285,10 @@ export function parseGuestForm(raw: unknown, ctx: ParseContext): GuestFormResult
         visa_type: is_foreign ? visa_type : '',
         visa_expiry: is_foreign ? visa_expiry : '',
         arrived_in_india_on: is_foreign ? arrived : '',
+        alternate_mobile: alt.value,
+        occupation,
+        emergency_name: emergencyName,
+        emergency_phone: emergencyPhone.value,
       },
       arrival: {
         expected_arrival_time: eta,

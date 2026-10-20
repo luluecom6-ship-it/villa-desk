@@ -58,8 +58,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   in-memory per server process (weak on serverless).
 - Deliberate exceptions: a failed submit removes only its own never-recorded uploads. Saved guests
   and ID files are never removed by the form (replaced IDs are marked superseded).
-- Not built yet: Form C data for occupants (lead only). Form 1 extras (alternate mobile, occupation,
-  emergency contact, occupant mobiles) are not collected: not in the PDR field list; ask the owner.
+- Not built yet: Form C data for occupants (lead only). Form 1 extras (migration 067, needs applying): lead alternate mobile, occupation, emergency contact name + mobile, and each extra guest's mobile, all optional (emergency name and number go together); shown to caretakers+ in the stay drawer via `contacts` in GET /api/stays/[id]. The Forms Pack text itself is not in the repo: anything else on printed Form 1 still needs the owner.
 - Caretaker ID access (054, needs applying): caretakers view IDs and upload on a guest's behalf
   (`staff_attach_document`, logged as `staff_upload`; the new file resets verification).
 - M3 part 1 (done, needs migration 055): scheduler `/api/stays/cron` (setup: docs/villa-scheduler.md),

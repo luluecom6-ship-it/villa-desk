@@ -48,6 +48,7 @@ interface Detail {
   } | null
   documents: Array<{ id: string; guest_id: string; side: string; content_type: string; size_bytes: number; archived_at?: string | null }>
   reviews?: Array<{ id: string; guest_id: string; action: 'approved' | 'rejected'; reason: string | null; reviewer_name: string | null; created_at: string }>
+  contacts?: Array<{ id: string; mobile: string | null; alternate_mobile: string | null; occupation: string | null; emergency_name: string | null; emergency_phone: string | null; email: string | null; nationality: string | null; address: string | null }>
   messages?: Array<{ message_key: string; due_at: string; status: string; sent_at: string | null; attempts: number; last_error: string | null }>
 }
 
@@ -373,6 +374,20 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                               {g.role === 'lead' ? t('drawer.lead') : g.is_adult ? t('drawer.adult') : t('drawer.child')}
                             </span>
                           </div>
+                          {(() => {
+                            const c = (detail?.contacts ?? []).find((x) => x.id === g.id)
+                            if (!c) return null
+                            const lines = [
+                              c.mobile && `Mobile: +${c.mobile}`,
+                              c.alternate_mobile && `Alternate: +${c.alternate_mobile}`,
+                              c.email && `Email: ${c.email}`,
+                              c.occupation && `Occupation: ${c.occupation}`,
+                              c.nationality && g.is_foreign && `Nationality: ${c.nationality}`,
+                              c.address && `Address: ${c.address}`,
+                              c.emergency_name && `Emergency contact: ${c.emergency_name}${c.emergency_phone ? ` (+${c.emergency_phone})` : ''}`,
+                            ].filter(Boolean) as string[]
+                            return lines.length ? <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">{lines.map((l) => <p key={l}>{l}</p>)}</div> : null
+                          })()}
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             {g.id_type && <span>{g.id_type.replace('_', ' ')}{g.id_last4 ? ` ····${g.id_last4}` : ''}</span>}
                             {g.form_c_required && <span className="text-amber-600 dark:text-amber-300">{t('drawer.formC')}</span>}

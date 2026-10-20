@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66|67)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -582,6 +582,17 @@ await rejects('a cost is applied only once', `SELECT public.damage_apply_to_depo
 const dm2 = await mkDmg(500);
 await rejects('a cost larger than what is left of the deposit is refused', `SELECT public.damage_apply_to_deposit('${acct}','${dm2.id}','${admin}','Tester')`, /exceeds_deposit/);
 ok('the deposit change is audited with the actor', (await one(`SELECT count(*)::int n FROM deposit_audit WHERE stay_id='${sDm.id}' AND changed_by_name='Tester'`)).n === 2);
+
+// ---- Migration 067: remaining Form 1 details --------------------------------------------
+const sF1 = await future(acct, prop, '919666000068');
+await rpc(sF1.form_token, formFor(sF1, rv, {
+  lead: { alternate_mobile: '919800000001', occupation: 'Engineer', emergency_name: 'Mother', emergency_phone: '919800000002' },
+  occupants: [{ client_key: 'o1', full_name: 'Friend', age: 30, is_adult: true, id_type: 'aadhaar', id_last4: '4321', mobile: '919800000003' }],
+  documents: [doc(sF1, 'lead', 'front', 'l.jpg'), doc(sF1, 'o1', 'front', 'o.jpg')],
+}));
+const f1 = await one(`SELECT alternate_mobile, occupation, emergency_name, emergency_phone FROM stay_guests WHERE stay_id='${sF1.id}' AND role='lead'`);
+ok('lead alternate mobile, occupation and emergency contact are stored', f1.alternate_mobile === '919800000001' && f1.occupation === 'Engineer' && f1.emergency_name === 'Mother' && f1.emergency_phone === '919800000002', JSON.stringify(f1));
+ok('an extra guest mobile is stored', (await one(`SELECT mobile FROM stay_guests WHERE stay_id='${sF1.id}' AND role='occupant'`)).mobile === '919800000003');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

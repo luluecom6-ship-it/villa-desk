@@ -66,7 +66,7 @@ export async function GET(
       admin
         .from('stay_guests')
         .select(
-          'id, role, full_name, age, is_adult, email, nationality, address, id_type, id_last4, is_foreign, visa_type, visa_expiry, arrived_in_india_on, id_verified_at, id_rejected_at, id_reject_reason',
+          'id, role, full_name, age, is_adult, email, nationality, address, id_type, id_last4, is_foreign, visa_type, visa_expiry, arrived_in_india_on, mobile, alternate_mobile, occupation, emergency_name, emergency_phone, id_verified_at, id_rejected_at, id_reject_reason',
         )
         .eq('stay_id', stay.id)
         .order('created_at', { ascending: true }),
@@ -131,6 +131,10 @@ export async function GET(
               visa_type: lead.visa_type ?? '',
               visa_expiry: lead.visa_expiry ?? '',
               arrived_in_india_on: lead.arrived_in_india_on ?? '',
+              alternate_mobile: lead.alternate_mobile ?? '',
+              occupation: lead.occupation ?? '',
+              emergency_name: lead.emergency_name ?? '',
+              emergency_phone: lead.emergency_phone ?? '',
             }
           : null,
         occupants: occupants.map((o, i) => ({
@@ -140,6 +144,7 @@ export async function GET(
           age: o.age ?? '',
           id_type: o.id_type ?? '',
           id_last4: o.id_last4 ?? '',
+          mobile: o.mobile ?? '',
         })),
         arrival: {
           expected_arrival_time: (stay.expected_arrival_time ?? '').slice(0, 5),
