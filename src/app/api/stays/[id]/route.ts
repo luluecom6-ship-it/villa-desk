@@ -12,6 +12,7 @@ import {
   decorateStay,
   GUEST_COLUMNS,
   isLivePhoneConflict,
+  closeFinishedStays,
   linkContact,
 } from '@/lib/stays/server'
 import type { StayWithGuests } from '@/lib/stays/types'
@@ -159,13 +160,20 @@ export async function PATCH(
       )
     }
 
-    const { data, error } = await ctx.supabase
-      .from('stays')
-      .update(patch)
-      .eq('id', id)
-      .eq('account_id', ctx.accountId)
-      .select(`*, stay_guests(${GUEST_COLUMNS})`)
-      .single()
+    const updateStay = () =>
+      ctx.supabase
+        .from('stays')
+        .update(patch)
+        .eq('id', id)
+        .eq('account_id', ctx.accountId)
+        .select(`*, stay_guests(${GUEST_COLUMNS})`)
+        .single()
+    let { data, error } = await updateStay()
+
+    if (isLivePhoneConflict(error) && typeof patch.guest_phone === 'string') {
+      const closed = await closeFinishedStays(ctx.supabase, ctx.accountId, patch.guest_phone, id)
+      if (closed > 0) ({ data, error } = await updateStay())
+    }
 
     if (isLivePhoneConflict(error)) {
       return NextResponse.json({ error: t('errors.phoneInUse') }, { status: 409 })

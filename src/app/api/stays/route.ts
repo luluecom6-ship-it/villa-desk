@@ -17,6 +17,7 @@ import {
   filterCounts,
   GUEST_COLUMNS,
   isLivePhoneConflict,
+  closeFinishedStays,
   linkContact,
 } from '@/lib/stays/server'
 import type { StayWithGuests } from '@/lib/stays/types'
@@ -99,17 +100,25 @@ export async function POST(request: Request) {
 
     // stay_ref, form_token and the draft/registered status are assigned by
     // the database trigger; nothing here lets the client choose them.
-    const { data, error } = await ctx.supabase
-      .from('stays')
-      .insert({
-        account_id: ctx.accountId,
-        property_id: propertyId,
-        contact_id: contactId,
-        created_by: ctx.userId,
-        ...input,
-      })
-      .select(`*, stay_guests(${GUEST_COLUMNS})`)
-      .single()
+    const insertStay = () =>
+      ctx.supabase
+        .from('stays')
+        .insert({
+          account_id: ctx.accountId,
+          property_id: propertyId,
+          contact_id: contactId,
+          created_by: ctx.userId,
+          ...input,
+        })
+        .select(`*, stay_guests(${GUEST_COLUMNS})`)
+        .single()
+    let { data, error } = await insertStay()
+
+    // Returning guest whose last stay is over but never marked checked out.
+    if (isLivePhoneConflict(error) && input.guest_phone) {
+      const closed = await closeFinishedStays(ctx.supabase, ctx.accountId, input.guest_phone)
+      if (closed > 0) ({ data, error } = await insertStay())
+    }
 
     if (isLivePhoneConflict(error)) {
       return NextResponse.json({ error: t('errors.phoneInUse') }, { status: 409 })

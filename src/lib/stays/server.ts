@@ -84,6 +84,32 @@ export function isLivePhoneConflict(error: { code?: string; message?: string } |
   )
 }
 
+/**
+ * A returning guest: their previous stay is still 'registered' or 'checked_in'
+ * after its check-out time, which holds the number under uq_stays_live_phone.
+ * Mark such finished stays checked out (history is kept, nothing deleted).
+ * Returns how many were closed. Stays that are still running are untouched.
+ */
+export async function closeFinishedStays(
+  db: SupabaseClient,
+  accountId: string,
+  phone: string,
+  exceptId?: string,
+  now: Date = new Date(),
+): Promise<number> {
+  let q = db
+    .from('stays')
+    .update({ status: 'checked_out' })
+    .eq('account_id', accountId)
+    .eq('guest_phone', phone)
+    .in('status', ['registered', 'checked_in'])
+    .lt('checkout_at', now.toISOString())
+  if (exceptId) q = q.neq('id', exceptId)
+  const { data, error } = await q.select('id')
+  if (error) return 0
+  return data?.length ?? 0
+}
+
 /** Decorate a stay row with computed dashboard fields. */
 export function decorateStay(
   stay: StayWithGuests,
