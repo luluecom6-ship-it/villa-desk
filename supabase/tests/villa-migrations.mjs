@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -540,6 +540,48 @@ await rejects('the archive log cannot be deleted', `DELETE FROM document_archive
 await db.exec(`INSERT INTO document_access_log(account_id, stay_id, document_id, opened_by, opened_role, action) VALUES ('${acct}','${sA.id}','${dd.id}','${admin}','admin','drive_open')`);
 ok('opening the Drive copy is logged', (await one(`SELECT count(*)::int n FROM document_access_log WHERE action='drive_open'`)).n === 1);
 ok('caretaker cannot read the archive log', (await count(agent, 'document_archive_log')) === 0 && (await count(admin, 'document_archive_log')) === 1);
+
+// ---- Migration 066: checklists and damage reports ---------------------------------------
+const sCk = await future(acct, prop, '919666000066');
+const snap = JSON.stringify([{ key: 'ac', section: 'Appliances', label: 'AC', type: 'check' }, { key: 'meter', section: 'Meters', label: 'Electricity', type: 'reading' }]);
+await db.exec(`INSERT INTO checklist_templates(account_id, property_id, items) VALUES ('${acct}','${prop}','${snap}')`);
+await db.exec(`INSERT INTO checklist_runs(account_id, stay_id, kind, template_snapshot) VALUES ('${acct}','${sCk.id}','arrival','${snap}')`);
+const runId = (await one(`SELECT id FROM checklist_runs WHERE stay_id='${sCk.id}'`)).id;
+await rejects('one run per stay and kind', `INSERT INTO checklist_runs(account_id, stay_id, kind, template_snapshot) VALUES ('${acct}','${sCk.id}','arrival','[]')`, /uq_checklist_runs|duplicate/);
+await db.exec(`SELECT public.checklist_save_answer('${acct}','${runId}','ac','{"status":"ok"}'::jsonb)`);
+await db.exec(`SELECT public.checklist_save_answer('${acct}','${runId}','meter','{"reading":1200}'::jsonb)`);
+ok('answers merge without overwriting each other', (await one(`SELECT answers FROM checklist_runs WHERE id='${runId}'`)).answers.ac.status === 'ok' && (await one(`SELECT answers FROM checklist_runs WHERE id='${runId}'`)).answers.meter.reading === 1200);
+await rejects('a completed run needs a completion time', `UPDATE checklist_runs SET status='completed' WHERE id='${runId}'`, /check/i);
+await db.exec(`UPDATE checklist_runs SET status='completed', completed_at=now() WHERE id='${runId}'`);
+await rejects('a completed checklist cannot be changed', `SELECT public.checklist_save_answer('${acct}','${runId}','ac','{"status":"issue"}'::jsonb)`, /cannot be changed/);
+await rejects('a checklist is never deleted', `DELETE FROM checklist_runs`, /cannot be deleted/);
+await db.exec(`INSERT INTO damage_reports(account_id, stay_id, run_id, item_key, title, estimated_cost) VALUES ('${acct}','${sCk.id}','${runId}','ac','AC remote broken',1500)`);
+await rejects('a damage title needs real text', `INSERT INTO damage_reports(account_id, stay_id, title) VALUES ('${acct}','${sCk.id}','x')`, /check/i);
+await rejects('an unknown damage status is refused', `UPDATE damage_reports SET status='bogus'`, /check/i);
+await db.exec(`UPDATE damage_reports SET status='discussed'`);
+ok('damage changes are audited with old and new', (await one(`SELECT count(*)::int n FROM damage_audit`)).n === 2);
+await rejects('a damage report is never deleted', `DELETE FROM damage_reports`, /cannot be deleted/);
+const dmgId = (await one(`SELECT id FROM damage_reports LIMIT 1`)).id;
+await rejects('a photo must belong to a run or a damage report', `INSERT INTO checklist_photos(account_id, stay_id, storage_path, content_type, size_bytes, sha256) VALUES ('${acct}','${sCk.id}','p/x.jpg','image/jpeg',10,'${sha}')`, /check/i);
+await db.exec(`INSERT INTO checklist_photos(account_id, stay_id, damage_id, storage_path, content_type, size_bytes, sha256) VALUES ('${acct}','${sCk.id}','${dmgId}','p/y.jpg','image/jpeg',10,'${sha}')`);
+await rejects('a photo is never deleted', `DELETE FROM checklist_photos`, /cannot be deleted/);
+ok('caretaker can read checklists, not damage costs', (await count(agent, 'checklist_runs')) === 1 && (await count(agent, 'checklist_templates')) === 1 && (await count(agent, 'damage_reports')) === 0 && (await count(admin, 'damage_reports')) === 1);
+ok('viewer reads none of it', (await count(viewer, 'checklist_runs')) === 0 && (await count(viewer, 'checklist_photos')) === 0);
+
+// 066: apply a damage cost to the deposit (atomic, once, only against a held deposit)
+const sDm = await future(acct, prop, '919666000067');
+const mkDmg = async (cost) => (await one(`SELECT public.damage_create('${acct}','${sDm.id}',NULL,'${admin}','Tester','{"title":"Broken lamp","estimated_cost":${cost}}'::jsonb) AS d`)).d;
+let dm = await mkDmg(800);
+await rejects('no deposit held: cannot apply the cost', `SELECT public.damage_apply_to_deposit('${acct}','${dm.id}','${admin}','Tester')`, /no_deposit_held/);
+await db.exec(`SELECT public.save_deposit('${acct}','${sDm.id}','${admin}','Tester','{"status":"held","amount":1000,"mode":"cash","received_at":"2026-10-20T10:00:00Z"}'::jsonb)`);
+await db.exec(`SELECT public.damage_apply_to_deposit('${acct}','${dm.id}','${admin}','Tester')`);
+ok('applying takes the cost off the deposit and settles the report', (await one(`SELECT deducted_amount::numeric d, status, deduction_reason FROM deposits WHERE stay_id='${sDm.id}'`)).d == 800
+  && (await one(`SELECT deduction_reason FROM deposits WHERE stay_id='${sDm.id}'`)).deduction_reason.includes('Broken lamp')
+  && (await one(`SELECT status, applied_at FROM damage_reports WHERE id='${dm.id}'`)).status === 'settled');
+await rejects('a cost is applied only once', `SELECT public.damage_apply_to_deposit('${acct}','${dm.id}','${admin}','Tester')`, /already_applied/);
+const dm2 = await mkDmg(500);
+await rejects('a cost larger than what is left of the deposit is refused', `SELECT public.damage_apply_to_deposit('${acct}','${dm2.id}','${admin}','Tester')`, /exceeds_deposit/);
+ok('the deposit change is audited with the actor', (await one(`SELECT count(*)::int n FROM deposit_audit WHERE stay_id='${sDm.id}' AND changed_by_name='Tester'`)).n === 2);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

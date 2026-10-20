@@ -21,6 +21,7 @@ import { BrowserNotificationsCard } from './browser-notifications-card';
 import { GuestAlertsCard } from './guest-alerts-card';
 import { VillaDetailsCard } from './villa-details-card';
 import { StorageBackupCard } from './storage-backup-card';
+import { ChecklistTemplateCard } from './checklist-template-card';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -367,6 +368,9 @@ export function ProfileForm() {
       </div>
       <div className="mt-6">
         <StorageBackupCard />
+      </div>
+      <div className="mt-6">
+        <ChecklistTemplateCard canEdit={profile?.role === 'owner' || profile?.role === 'admin'} />
       </div>
       <BrowserNotificationsCard className="mt-6" />
     </section>

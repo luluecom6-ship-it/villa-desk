@@ -29,6 +29,7 @@ import { StayFormDialog, type SavedStay } from './stay-form-dialog'
 import { StaffIdUpload } from './staff-id-upload'
 import { useCan } from '@/hooks/use-can'
 import { DepositCard } from './deposit-card'
+import { StayChecklists } from './stay-checklists'
 
 export type DrawerStay = Omit<StayRow, 'form_token'> & {
   automation: AutomationState
@@ -609,6 +610,10 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
 
                 {isAdmin && stay.status !== 'cancelled' && stay.status !== 'sample' && (
                   <DepositCard key={`${stay.id}:${stay.status}`} stayId={stay.id} onChanged={onChanged} />
+                )}
+
+                {canIds && stay.status !== 'cancelled' && stay.status !== 'sample' && (
+                  <StayChecklists key={stay.id} stayId={stay.id} isAdmin={isAdmin} active={stay.status === 'registered' || stay.status === 'checked_in'} />
                 )}
 
                 {canCheckout && (

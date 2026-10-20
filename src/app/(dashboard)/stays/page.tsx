@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { CalendarCheck, Loader2, Plus, Search } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -104,12 +105,17 @@ export default function StaysPage() {
           <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
-        {isAdmin && (
-          <Button onClick={() => setNewOpen(true)} className="w-full sm:w-auto">
-            <Plus className="size-4" />
-            {t('newRegistration')}
-          </Button>
-        )}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link href="/stays/damage" className="inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted sm:w-auto">
+            Damage reports
+          </Link>
+          {isAdmin && (
+            <Button onClick={() => setNewOpen(true)} className="w-full sm:w-auto">
+              <Plus className="size-4" />
+              {t('newRegistration')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {isAdmin && <WhatsAppBanner />}
