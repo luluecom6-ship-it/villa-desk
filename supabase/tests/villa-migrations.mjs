@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -313,6 +313,13 @@ await rpcRejects('occupant id from another stay rejected', sA.form_token, formFo
 // After check-in an already-submitted form is read-only.
 await db.exec(`UPDATE stays SET checkin_at = now() - interval '1 hour' WHERE id='${sA.id}'`);
 await rpcRejects('submitted form is read-only after check-in', sA.form_token, formFor(sA, rv, { documents: [] }), /stay_form:closed/);
+
+// 063: ...unless staff rejected an ID: then the guest can upload it again.
+await db.exec(`UPDATE stay_guests SET id_rejected_at = now(), id_reject_reason = 'blurry' WHERE id='${leadId}'`);
+const rReopen = await rpc(sA.form_token, formFor(sA, rv, { documents: [doc(sA, 'lead', 'front', 'lead-front-v3.jpg')] }));
+ok('rejected ID can be re-uploaded after check-in (063)', rReopen.ok === true);
+await db.exec(`UPDATE stay_guests SET id_rejected_at = NULL, id_reject_reason = NULL WHERE id='${leadId}'`);
+await rpcRejects('closed again once no ID is rejected (063)', sA.form_token, formFor(sA, rv, { documents: [] }), /stay_form:closed/);
 
 // ...but a guest who has not submitted yet can still do so until the stay ends.
 const sD = await future(acct, prop, '919333333333');

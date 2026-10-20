@@ -61,11 +61,28 @@ export async function findFormStay(
 }
 
 /** Once submitted, the form can be edited only until check-in (PDR 6.1). */
-export function isFormReadOnly(stay: FormStayRow, now: Date = new Date()): boolean {
+export function isFormReadOnly(
+  stay: FormStayRow,
+  now: Date = new Date(),
+  hasRejectedId = false,
+): boolean {
+  // A guest whose ID was rejected can always upload it again (migration 063).
+  if (hasRejectedId) return false
   return (
     stay.form_status === 'submitted' &&
     (stay.status === 'checked_in' || new Date(stay.checkin_at) <= now)
   )
+}
+
+/** True while staff have rejected at least one guest's ID on this stay. */
+export async function stayHasRejectedId(admin: SupabaseClient, stayId: string): Promise<boolean> {
+  const { data } = await admin
+    .from('stay_guests')
+    .select('id')
+    .eq('stay_id', stayId)
+    .not('id_rejected_at', 'is', null)
+    .limit(1)
+  return !!data && data.length > 0
 }
 
 export interface LatestRules {

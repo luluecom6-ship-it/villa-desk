@@ -109,6 +109,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
 - Returning guests: a new registration (or corrected number) that hits `uq_stays_live_phone` first marks that number's stays whose check-out has passed as `checked_out` (`closeFinishedStays` in stays/server.ts), then retries once. A stay still running keeps the number and the 409 stays.
 - Mark as checked out: button in the stay drawer (caretaker+, POST /api/stays/[id]/checkout, status only, nothing deleted). The first `form_link` is sent even if check-in has already passed (skipped only after check-out or once the form is submitted).
 - Form received receipt: after a form submit (or re-submit) the guest gets "we received your form, pending review" from the villa number (`sendFormReceivedMessage`, messaging/form-received.ts, from the public submit route via `after()`; any hour, no ID details, best effort).
+- Rejected ID re-upload (migration 063): a submitted form is read-only after check-in, EXCEPT while any guest's ID is rejected (RPC `submit_stay_form` and `isFormReadOnly(stay, now, hasRejectedId)`), so the link in the "ID rejected" message always works.
 - Next after M3: M4 deposits, audit log, hardening; M5 checklists and damage report.
 - Open: house rules are not published yet. The editor on /stays is pre-filled with the 13 rules from
   Form 2 of the Forms Pack (src/lib/stays/default-house-rules.ts); an admin reviews and presses Publish.

@@ -17,6 +17,7 @@ import {
   FORM_BUCKET,
   getClientIp,
   isFormReadOnly,
+  stayHasRejectedId,
   latestHouseRules,
   mapSubmitError,
   maskPhone,
@@ -115,7 +116,7 @@ export async function GET(
       },
       rules: rules ? { id: rules.id, version: rules.version, title: rules.title, body: rules.body } : null,
       submitted: stay.form_status === 'submitted',
-      read_only: isFormReadOnly(stay),
+      read_only: isFormReadOnly(stay, new Date(), Object.values(review).some((r) => r.status === 'rejected')),
       signed: !!acceptance,
       existing: {
         lead: lead
@@ -192,7 +193,7 @@ export async function POST(
   const admin = supabaseAdmin()
   const stay = await findFormStay(admin, token)
   if (!stay) return notValid()
-  if (isFormReadOnly(stay)) {
+  if (isFormReadOnly(stay, new Date(), await stayHasRejectedId(admin, stay.id))) {
     return NextResponse.json({ error: t('errors.formClosed') }, { status: 409, headers: NO_STORE })
   }
 
