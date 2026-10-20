@@ -72,7 +72,7 @@ export function guestOrderDeclined(reason: string | null): string {
 
 /** What the caretaker sees for a new order (the first thing in the forwarded WhatsApp copy). */
 export function caretakerOrderText(orderNo: number, lines: OrderLine[], total: number): string {
-  return `🍽️ *Food order F${orderNo}*\n${orderLinesText(lines)}\n*Total: ${inr(total)}*\n\nReply */ok* to confirm or */no reason* to decline.`
+  return `🍽️ *Food order F${orderNo}*\n${orderLinesText(lines)}\n*Total: ${inr(total)}*\n\nReply *ok* to confirm, or */no reason* to decline.`
 }
 
 export const FOOD_NOT_READY = 'Our food menu is not ready yet. Please write *hi* and choose the caretaker, and they will help you.'

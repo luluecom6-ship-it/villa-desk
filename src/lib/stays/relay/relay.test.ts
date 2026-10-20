@@ -268,4 +268,22 @@ describe('food order commands from the caretaker\'s WhatsApp', () => {
     const r2 = await onAgentMessage(db, { accountId: 'a', agent, msg: msg('/no #482 closed'), siteUrl: '' })
     expect(r2).toBe('agent_order_none')
   })
+
+  it('a plain "ok" with an order waiting confirms it instead of going to the guest', async () => {
+    db.tables.food_orders = [{ id: 'o1', account_id: 'a', order_no: 12, stay_id: 's1', conversation_id: 'c1', items: [{ name: 'Idli', price: 100, qty: 2 }], total: 200, status: 'pending', created_at: '1' }]
+    db.tables.stays[0].status = 'registered'
+    const agent = (await findRelayAgent(db, 'a', '966500000002'))!
+    const r = await onAgentMessage(db, { accountId: 'a', agent, msg: { id: 'A-ok2', text: '#482 ok', quotedId: null, hasMedia: false }, siteUrl: '' })
+    expect(r).toBe('agent_order_confirmed')
+    expect(db.tables.food_orders[0].status).toBe('confirmed')
+  })
+
+  it('"ok" with no order waiting is an ordinary reply to the guest', async () => {
+    db.tables.food_orders = []
+    db.tables.stays[0].status = 'registered'
+    const agent = (await findRelayAgent(db, 'a', '966500000002'))!
+    const r = await onAgentMessage(db, { accountId: 'a', agent, msg: { id: 'A-ok3', text: '#482 ok', quotedId: null, hasMedia: false }, siteUrl: '' })
+    expect(r).not.toBe('agent_order_confirmed')
+    expect(r).not.toBe('agent_order_none')
+  })
 })

@@ -9,7 +9,7 @@ import { sendMessageToConversation } from '@/lib/whatsapp/send-message'
 import { loadResponders } from '../escalation/server'
 import { decideOrder } from '../food/server'
 import type { Responder } from '../escalation/plan'
-import { HELP_TEXT, forwardText, maskPhone, parseAgentMessage, type GuestCard } from './logic'
+import { HELP_TEXT, forwardText, maskPhone, orderAnswerFromReply, parseAgentMessage, type GuestCard } from './logic'
 
 // Agent relay, database + WhatsApp side. Rules live in ./logic.ts.
 //
@@ -295,7 +295,7 @@ export async function onAgentMessage(
 ): Promise<string> {
   const { accountId, agent, msg } = args
   const phone = agent.alertPhone as string
-  const cmd = parseAgentMessage(msg.text)
+  let cmd = parseAgentMessage(msg.text)
   const react = async (emoji: string) => {
     try {
       const { conn } = await connection(db, accountId)
@@ -323,6 +323,14 @@ export async function onAgentMessage(
   if (!conversationId) {
     await tell(db, accountId, phone, `⚠️ Not sent. Which guest is this for? Swipe-reply to their message, or start with their number (e.g. #482).\n\n${await listText(db, accountId, agent)}`)
     return 'agent_no_target'
+  }
+  // "ok" / "no" swiped onto a guest who has a food order waiting answers that order (it is not a message for the guest).
+  if (cmd.kind === 'reply' && !msg.hasMedia) {
+    const answer = orderAnswerFromReply(cmd.text)
+    if (answer) {
+      const { data: waiting } = await db.from('food_orders').select('id').eq('account_id', accountId).eq('conversation_id', conversationId).eq('status', 'pending').limit(1)
+      if (waiting && waiting.length > 0) cmd = answer.kind === 'approve' ? { kind: 'approve', code: null } : { kind: 'decline', reason: answer.reason, code: null }
+    }
   }
   const { card, code, stayId } = await guestCard(db, accountId, conversationId)
   const label = `#${code} ${card.name ?? maskPhone(card.phoneDigits)}`
