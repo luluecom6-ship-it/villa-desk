@@ -107,7 +107,7 @@ export async function handleStayInbound(
         })
       }
     }
-    return { registered: false, handled: false, suppressAutomation: suppress, escalation: escalation ?? 'no_active_stay_for_number' }
+    return { registered: false, handled: false, suppressAutomation: suppress, escalation: escalation ?? `no_active_stay_for_number_${(args.phone ?? '').replace(/\D/g, '').slice(-4) || 'none'}` }
   }
 
   const { data: full } = await db
