@@ -43,6 +43,7 @@
     "menuSettings": "Configuración",
     "menuSignOut": "Cerrar sesión",
     "stays": "Stays",
+    "food": "Food",
     "subtitle": "Villa operations"
   },
   "Header": {
@@ -61,7 +62,8 @@
     "menuProfile": "Perfil",
     "menuSettings": "Configuración",
     "menuSignOut": "Cerrar sesión",
-    "stays": "Stays"
+    "stays": "Stays",
+    "food": "Food"
   },
   "ModeToggle": {
     "switchMode": "Cambiar al modo {mode}"

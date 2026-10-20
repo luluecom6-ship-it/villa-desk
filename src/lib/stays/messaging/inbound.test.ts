@@ -124,14 +124,10 @@ describe('the guest menu', () => {
     expect((db.tables.notifications ?? []).length).toBeGreaterThan(0)
   })
 
-  it('4 asks for the food request and the next message goes to the caretaker', async () => {
+  it('4 with no food menu set up yet says so', async () => {
     await say('hi')
     await say('4')
-    expect(lastText()).toContain('Food')
-    expect(db.tables.conversations[0].guest_menu_state).toBe('food')
-    await say('2 vegetarian thalis at 8 pm')
-    expect(lastText()).toContain('passed your food request')
-    expect(db.tables.notifications.some((n) => String(n.body).includes('Food request') && String(n.body).includes('thalis'))).toBe(true)
+    expect(lastText()).toContain('not ready yet')
     expect(db.tables.conversations[0].guest_menu_state).toBeNull()
   })
 

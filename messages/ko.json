@@ -43,6 +43,7 @@
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
     "stays": "Stays",
+    "food": "Food",
     "subtitle": "Villa operations"
   },
   "Header": {
@@ -61,7 +62,8 @@
     "menuProfile": "프로필",
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
-    "stays": "Stays"
+    "stays": "Stays",
+    "food": "Food"
   },
   "ModeToggle": {
     "switchMode": "{mode} 모드로 전환"

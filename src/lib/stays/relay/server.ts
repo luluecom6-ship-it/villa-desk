@@ -7,6 +7,7 @@ import { recordSend, sendGate } from '@/lib/evolution/safety-server'
 import { connFromRow, loadEvolutionConfig } from '@/lib/evolution/server'
 import { sendMessageToConversation } from '@/lib/whatsapp/send-message'
 import { loadResponders } from '../escalation/server'
+import { decideOrder } from '../food/server'
 import type { Responder } from '../escalation/plan'
 import { HELP_TEXT, forwardText, maskPhone, parseAgentMessage, type GuestCard } from './logic'
 
@@ -346,6 +347,24 @@ export async function onAgentMessage(
     const stay = [card.stayRef, card.stayDates].filter(Boolean).join(' · ')
     await tell(db, accountId, phone, [`*${label}* (${maskPhone(card.phoneDigits)})`, stay, '', last, args.siteUrl ? `\n${args.siteUrl}/inbox` : ''].filter((l) => l !== undefined && l !== null).join('\n').trim())
     return 'agent_info'
+  }
+
+  if (cmd.kind === 'approve' || cmd.kind === 'decline') {
+    const r = await decideOrder(db, {
+      accountId,
+      conversationId,
+      decision: cmd.kind === 'approve' ? 'confirmed' : 'declined',
+      byUserId: agent.userId,
+      byName: agent.name ?? null,
+      reason: cmd.kind === 'decline' ? cmd.reason : null,
+    })
+    if (!r.ok) {
+      await tell(db, accountId, phone, r.error === 'already_decided' ? `ℹ️ ${label}: that order was already answered.` : `ℹ️ ${label} has no food order waiting.`)
+      return 'agent_order_none'
+    }
+    const told = r.guestMessage === 'sent' ? 'The guest has been told.' : '⚠️ The guest could not be messaged just now: tell them by hand.'
+    await tell(db, accountId, phone, `${cmd.kind === 'approve' ? '✅' : '❌'} Order F${r.orderNo} ${cmd.kind === 'approve' ? 'confirmed' : 'declined'} for ${label}. ${told}`)
+    return cmd.kind === 'approve' ? 'agent_order_confirmed' : 'agent_order_declined'
   }
 
   if (cmd.kind === 'transfer') {

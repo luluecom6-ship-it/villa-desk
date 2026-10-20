@@ -33,7 +33,7 @@ export function evolutionErrorCode(e: unknown): string {
   return `evolution_${status}`
 }
 
-export const evolutionStayTransport: StayTransport = async ({ db, accountId, phone, guestName, text, kind }) => {
+export const evolutionStayTransport: StayTransport = async ({ db, accountId, phone, guestName, text, kind, media }) => {
   // 'immediate' (first form link) is business-initiated like 'scheduled': it counts toward the daily
   // limit but ignores the sending hours.
   const sendKind = kind === 'scheduled' || kind === 'immediate' ? 'scheduled' : 'reply'
@@ -61,7 +61,7 @@ export const evolutionStayTransport: StayTransport = async ({ db, accountId, pho
   const conv = await resolveConversationByPhone(db, accountId, `+${phone}`, guestName, { requireMetaConfig: false })
   try {
     const delayMs = sendKind === 'scheduled' ? 1500 + Math.floor(Math.random() * 2500) : undefined
-    const { id } = await sendText(conn, phone, text, { delayMs })
+    const { id } = media ? await sendMedia(conn, phone, { kind: media.kind, url: media.url, caption: text || undefined }) : await sendText(conn, phone, text, { delayMs })
     const messageId = id ?? `evo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     await recordSend(accountId, { ok: true, kind: sendKind, phone }, db)
 
@@ -70,8 +70,9 @@ export const evolutionStayTransport: StayTransport = async ({ db, accountId, pho
       conversation_id: conv.conversationId,
       // Automatic: stored as the bot so it never counts as a person replying to the guest.
       sender_type: 'bot',
-      content_type: 'text',
-      content_text: text,
+      content_type: media ? media.kind : 'text',
+      content_text: text || null,
+      ...(media ? { media_url: media.url, media_type: 'image/jpeg' } : {}),
       message_id: messageId,
       status: 'sent',
     })

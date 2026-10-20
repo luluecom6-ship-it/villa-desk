@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -484,6 +484,17 @@ await db.exec(`UPDATE conversations SET guest_menu_state='main', guest_menu_at=n
 await rejects('the guest menu state must be a known step', `UPDATE conversations SET guest_menu_state='bogus' WHERE id='${convA.id}'`, /check/i);
 await db.exec(`UPDATE conversations SET guest_menu_state=NULL, guest_menu_at=NULL WHERE id='${convA.id}'`);
 ok('the guest menu state can be cleared', (await one(`SELECT guest_menu_state FROM conversations WHERE id='${convA.id}'`)).guest_menu_state === null);
+
+// ---- Migration 062: food menu and orders -----------------------------------------------
+await db.exec(`INSERT INTO food_items(account_id, name, price, sort_order) VALUES ('${acct}','Idli',100,1)`);
+await rejects('a food item needs a name', `INSERT INTO food_items(account_id, name, price) VALUES ('${acct}','  ',10)`, /check/i);
+await rejects('a price cannot be negative', `INSERT INTO food_items(account_id, name, price) VALUES ('${acct}','Tea',-1)`, /check/i);
+await db.exec(`INSERT INTO food_orders(account_id, items, total) VALUES ('${acct}','[{"name":"Idli","price":100,"qty":2}]',200)`);
+await rejects('a decided order must carry its decision time', `UPDATE food_orders SET status='confirmed'`, /check/i);
+await db.exec(`UPDATE food_orders SET status='confirmed', decided_at=now()`);
+await rejects('an order is never deleted', `DELETE FROM food_orders`, /cannot be deleted/);
+ok('caretaker can read the menu and orders', (await count(agent, 'food_items')) === 1 && (await count(agent, 'food_orders')) === 1);
+ok('viewer cannot read the menu or orders', (await count(viewer, 'food_items')) === 0 && (await count(viewer, 'food_orders')) === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

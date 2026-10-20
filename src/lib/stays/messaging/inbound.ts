@@ -7,8 +7,10 @@ import { logStayMessage, sendStayWhatsApp, type StayTransport } from './send'
 import { DEFAULT_TEMPLATES, firstName, renderTemplate } from './templates'
 import { buildValues } from './scheduler'
 import { villaModeOn } from './villa-mode'
-import { CARETAKER_REPLY, FOOD_PROMPT, FOOD_THANKS, isGreeting, isMenuNumber, menuIsFresh, menuText, parseMenuChoice, type MenuChoice } from '../menu/logic'
+import { CARETAKER_REPLY, isGreeting, isMenuNumber, menuIsFresh, menuText, parseMenuChoice, type MenuChoice } from '../menu/logic'
 import { stayFormUrl } from '../server'
+import { FOOD_NOTE_THANKS, FOOD_NOT_READY, FOOD_RETRY, parseOrder } from '../food/logic'
+import { loadMenu, placeOrder, sendFoodMenu } from '../food/server'
 
 // Replies from guests (PDR 7.2). Runs at the top of the inbound handler, and
 // only does anything for numbers on the allow-list.
@@ -158,26 +160,39 @@ export async function handleStayInbound(
 
   if (isGreeting(args.text)) return showMenu()
 
-  if (open === 'food' && args.text.trim() && parseMenuChoice(args.text) === null) {
-    // The next message after the food question is the request itself: the caretaker gets it.
+  if (open === 'food' && args.text.trim()) {
+    // The guest is answering the food menu: item numbers make an order, anything else is a note for the caretaker.
+    const stayRef = { id: stay.id, guest_phone: full.guest_phone, guest_name: full.guest_name }
+    const { items } = await loadMenu(db, args.accountId)
+    const parsed = items.length > 0 ? parseOrder(args.text, items) : ({ kind: 'text' } as const)
+    if (parsed.kind === 'unknown_items') {
+      await reply(`${FOOD_RETRY}\nThe menu has items 1 to ${items.length}.`, 'menu_food_retry')
+      await setMenu('food') // keep waiting for a proper order
+      return handledMenu
+    }
     await setMenu(null)
+    if (parsed.kind === 'order') {
+      await placeOrder(db, { accountId: args.accountId, stay: stayRef, conversationId: args.conversationId, lines: parsed.lines, total: parsed.total, messageId: args.messageId, siteUrl: siteUrlOf(args.requestUrl), label: who, now, transport: args.transport, report })
+      await logMenu('inbound_food_order')
+      return { ...handledMenu, escalation }
+    }
     if (args.conversationId) {
       await openEscalation(db, {
         accountId: args.accountId,
         conversationId: args.conversationId,
         stayId: stay.id,
         label: who,
-        preview: `🍽️ Food request: ${args.text.trim()}`,
+        preview: `🍽️ Food note: ${args.text.trim()}`,
         messageId: args.messageId,
         siteUrl: siteUrlOf(args.requestUrl),
         now,
         report,
       })
     } else {
-      await notifyStaff(db, args.accountId, `Food request: ${who}`, args.text.trim().slice(0, 300), { includeCaretakers: true })
+      await notifyStaff(db, args.accountId, `Food note: ${who}`, args.text.trim().slice(0, 300), { includeCaretakers: true })
     }
-    await reply(FOOD_THANKS, 'menu_food_thanks')
-    await logMenu('inbound_food')
+    await reply(FOOD_NOTE_THANKS, 'menu_food_note')
+    await logMenu('inbound_food_note')
     return { ...handledMenu, escalation }
   }
 
@@ -222,8 +237,12 @@ export async function handleStayInbound(
     return { ...handledMenu, escalation }
   }
   if (choice === 'food') {
-    await reply(FOOD_PROMPT, 'menu_food')
-    await setMenu('food')
+    const shown = await sendFoodMenu(db, { accountId: args.accountId, stay: { id: stay.id, guest_phone: full.guest_phone, guest_name: full.guest_name }, now, transport: args.transport })
+    if (shown) await setMenu('food')
+    else {
+      await reply(FOOD_NOT_READY, 'menu_food_none')
+      await setMenu(null)
+    }
     await logMenu('inbound_food_ask')
     return handledMenu
   }

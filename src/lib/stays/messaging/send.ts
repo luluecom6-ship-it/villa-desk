@@ -21,6 +21,8 @@ export interface StayTransportArgs {
   phone: string
   guestName: string
   text: string
+  /** A picture to send with the text as its caption (Evolution only; Meta falls back to the text). */
+  media?: { url: string; kind: 'image' }
   /** Approved Meta template to use instead of free text. */
   template?: { name: string; params: string[] }
   /**

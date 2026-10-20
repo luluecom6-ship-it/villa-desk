@@ -35,7 +35,7 @@ class Q {
       const made: Row[] = []
       for (const p of this.payload) {
         if (this.mode === 'upsert' && rows.some((r) => ('message_id' in p ? r.conversation_id === p.conversation_id && r.message_id === p.message_id : r.stay_id === p.stay_id && r.message_key === p.message_key))) continue
-        const row = { id: `${this.table}-${++this.db.seq}`, updated_at: new Date(0).toISOString(), attempts: 0, ...p }
+        const row = { id: `${this.table}-${++this.db.seq}`, updated_at: new Date(0).toISOString(), attempts: 0, ...(this.table === 'food_orders' ? { status: 'pending', order_no: this.db.seq } : {}), ...p }
         rows.push(row)
         made.push(row)
       }

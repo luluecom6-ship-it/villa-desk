@@ -15,6 +15,8 @@ export type AgentCommand =
   | { kind: 'close'; code: number | null }
   | { kind: 'info'; code: number | null }
   | { kind: 'transfer'; to: string; code: number | null }
+  | { kind: 'approve'; code: number | null }
+  | { kind: 'decline'; reason: string; code: number | null }
   | { kind: 'reply'; text: string; code: number | null }
 
 const CODE = /#(\d{2,9})\b/
@@ -54,6 +56,15 @@ export function parseAgentMessage(raw: string | null | undefined): AgentCommand 
     case 'list':
     case 'chats':
       return { kind: 'list' }
+    case 'ok':
+    case 'yes':
+    case 'approve':
+    case 'confirm':
+      return { kind: 'approve', code }
+    case 'no':
+    case 'decline':
+    case 'reject':
+      return { kind: 'decline', reason: rest, code }
     case 'transfer':
     case 'move':
       return { kind: 'transfer', to: rest, code }
@@ -66,6 +77,8 @@ export const HELP_TEXT = [
   '*How to answer guests*',
   "Swipe-reply to a guest's message (or start with its number, e.g. #482) and type your answer. It goes to the guest from the villa number.",
   '',
+  '/ok  confirm the guest\'s food order',
+  '/no reason  decline the food order (the reason is sent to the guest)',
   '/close  finish the chat (stop reminders)',
   '/transfer Sara  give the chat to another person',
   '/info  guest and stay details',

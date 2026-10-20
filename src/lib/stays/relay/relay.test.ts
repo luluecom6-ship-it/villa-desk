@@ -254,3 +254,18 @@ describe('an agent who cannot be reached on WhatsApp', () => {
     expect(bells.filter((n: any) => n.user_id === 'owner')).toHaveLength(1) // not repeated within 30 minutes
   })
 })
+
+describe('food order commands from the caretaker\'s WhatsApp', () => {
+  it('/ok confirms the waiting order and /no needs a pending one', async () => {
+    db.tables.food_orders = [{ id: 'o1', account_id: 'a', order_no: 12, stay_id: 's1', conversation_id: 'c1', items: [{ name: 'Idli', price: 100, qty: 2 }], total: 200, status: 'pending', created_at: '1' }]
+    db.tables.stays[0].status = 'registered'
+    const msg = (text: string) => ({ id: `A-${text}`, text, quotedId: null, hasMedia: false })
+    const agent = (await findRelayAgent(db, 'a', '966500000002'))!
+    const r1 = await onAgentMessage(db, { accountId: 'a', agent, msg: msg('/ok #482'), siteUrl: '' })
+    expect(r1).toBe('agent_order_confirmed')
+    expect(db.tables.food_orders[0]).toMatchObject({ status: 'confirmed', decided_by_name: 'Ravi' })
+    expect(sentTo('966500000002').at(-1)).toContain('Order F12 confirmed')
+    const r2 = await onAgentMessage(db, { accountId: 'a', agent, msg: msg('/no #482 closed'), siteUrl: '' })
+    expect(r2).toBe('agent_order_none')
+  })
+})
