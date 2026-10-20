@@ -107,7 +107,7 @@ export async function handleStayInbound(
         })
       }
     }
-    return { registered: false, handled: false, suppressAutomation: suppress, escalation }
+    return { registered: false, handled: false, suppressAutomation: suppress, escalation: escalation ?? 'no_active_stay_for_number' }
   }
 
   const { data: full } = await db
@@ -152,10 +152,11 @@ export async function handleStayInbound(
 
   const showMenu = async () => {
     const { data: prop } = await db.from('properties').select('name').eq('id', full.property_id).maybeSingle()
-    await reply(menuText(firstName(full.guest_name), (prop?.name as string | undefined) ?? ''), 'menu')
+    const sent = await reply(menuText(firstName(full.guest_name), (prop?.name as string | undefined) ?? ''), 'menu')
+    escalation = `menu_${sent.outcome}${'reason' in sent && sent.reason ? `:${sent.reason}` : ''}` // shown in the event log
     await setMenu('main')
     await logMenu('inbound_menu')
-    return handledMenu
+    return { ...handledMenu, escalation }
   }
 
   if (isGreeting(args.text)) return showMenu()

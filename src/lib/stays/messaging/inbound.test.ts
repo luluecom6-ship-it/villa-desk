@@ -159,7 +159,7 @@ describe('the guest menu', () => {
 describe('unregistered numbers', () => {
   it('READY from an unknown number triggers no stay logic and no reply', async () => {
     const r = await inbound('919555555555', 'READY')
-    expect(r).toEqual({ registered: false, handled: false, suppressAutomation: true })
+    expect(r).toMatchObject({ registered: false, handled: false, suppressAutomation: true })
     expect(db.tables.stays[0].on_the_way_at).toBeNull()
     expect(db.tables.notifications ?? []).toHaveLength(0)
     expect(transport).not.toHaveBeenCalled()
@@ -179,7 +179,7 @@ describe('unregistered numbers', () => {
   it('an account that is not a villa account is left alone', async () => {
     seed({}, false)
     const r = await inbound('919555555555', 'hello')
-    expect(r).toEqual({ registered: false, handled: false, suppressAutomation: false })
+    expect(r).toMatchObject({ registered: false, handled: false, suppressAutomation: false })
   })
 
   it('logs the ignored message with only the last 4 digits', async () => {
