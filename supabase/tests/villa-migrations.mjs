@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -521,6 +521,25 @@ await rejects('a deposit is never deleted', `DELETE FROM deposits WHERE stay_id=
 await rejects('the audit trail cannot be edited', `UPDATE deposit_audit SET action='created'`, /immutable/);
 ok('admin can read deposits', (await count(admin, 'deposits')) === 1);
 ok('caretaker and viewer cannot read deposit amounts', (await count(agent, 'deposits')) === 0 && (await count(viewer, 'deposits')) === 0 && (await count(agent, 'deposit_audit')) === 0);
+
+// ---- Migration 065: Drive archive ------------------------------------------------------
+const dd = (await one(`SELECT id, sha256, size_bytes FROM stay_documents WHERE stay_id='${sA.id}' AND superseded_at IS NULL LIMIT 1`));
+await rejects('a file with no Drive copy cannot be archived', `UPDATE stay_documents SET archived_at = now() WHERE id='${dd.id}'`, /check/i);
+await rejects('a Drive copy with a different checksum cannot be archived', `UPDATE stay_documents SET drive_file_id='f1', drive_copied_at=now(), drive_checksum='${'0'.repeat(64)}', drive_size_bytes=${dd.size_bytes}, archived_at=now() WHERE id='${dd.id}'`, /check/i);
+await rejects('a Drive copy with a different size cannot be archived', `UPDATE stay_documents SET drive_file_id='f1', drive_copied_at=now(), drive_checksum='${dd.sha256}', drive_size_bytes=1, archived_at=now() WHERE id='${dd.id}'`, /check/i);
+await db.exec(`UPDATE stay_documents SET drive_file_id='f1', drive_url='https://drive.example/f1', drive_copied_at=now(), drive_checksum='${dd.sha256}', drive_size_bytes=${dd.size_bytes} WHERE id='${dd.id}'`);
+ok('a verified copy is recorded without archiving', (await one(`SELECT archived_at FROM stay_documents WHERE id='${dd.id}'`)).archived_at === null);
+await db.exec(`UPDATE stay_documents SET drive_missing_at = now() WHERE id='${dd.id}'`);
+await rejects('a file whose Drive copy went missing cannot be archived', `SELECT public.archive_document('${acct}','${dd.id}','${admin}')`, /drive_missing/);
+await db.exec(`UPDATE stay_documents SET drive_missing_at = NULL WHERE id='${dd.id}'`);
+ok('archive_document archives a verified file once and logs it', (await one(`SELECT public.archive_document('${acct}','${dd.id}','${owner}') AS r`)).r === true
+  && (await one(`SELECT public.archive_document('${acct}','${dd.id}','${owner}') AS r`)).r === false
+  && (await one(`SELECT count(*)::int n FROM document_archive_log WHERE document_id='${dd.id}' AND action='archived'`)).n === 1);
+await rejects('the archive log cannot be edited', `UPDATE document_archive_log SET action='copied'`, /immutable/);
+await rejects('the archive log cannot be deleted', `DELETE FROM document_archive_log`, /cannot be deleted/);
+await db.exec(`INSERT INTO document_access_log(account_id, stay_id, document_id, opened_by, opened_role, action) VALUES ('${acct}','${sA.id}','${dd.id}','${admin}','admin','drive_open')`);
+ok('opening the Drive copy is logged', (await one(`SELECT count(*)::int n FROM document_access_log WHERE action='drive_open'`)).n === 1);
+ok('caretaker cannot read the archive log', (await count(agent, 'document_archive_log')) === 0 && (await count(admin, 'document_archive_log')) === 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

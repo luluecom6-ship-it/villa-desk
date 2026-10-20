@@ -1,0 +1,295 @@
+{
+  "name": "Villa stays: weekly Drive check + database export",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Villa stays: weekly Drive check and database export\n**Check:** asks the app which Drive files should exist, looks each one up in Drive, and reports back. A missing or trashed file raises an alert to the owner (urgent if Supabase no longer has the file).\n**Export:** saves a copy of the stays, guests, deposits and logs (no ID images) into the same Drive folder, so you have a backup even on the free Supabase plan.\n\n**Before activating:** replace `YOUR-APP.vercel.app` and `PASTE_AUTOMATION_CRON_SECRET` in the *villa app* nodes, pick your Google credential in the Drive nodes and the folder in *Save export to Drive*, then turn **Active**. Runs Sundays at 03:00.",
+        "height": 360,
+        "width": 520
+      },
+      "id": "note-1",
+      "name": "Read me",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "trigger-b",
+      "name": "Every Sunday 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        360,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://YOUR-APP.vercel.app/api/stays/backup/verify-list",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-cron-secret",
+              "value": "PASTE_AUTOMATION_CRON_SECRET"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "vlist",
+      "name": "Get Drive files to check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "files",
+        "options": {}
+      },
+      "id": "split-b",
+      "name": "One per Drive file",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        840,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.drive_file_id }}?fields=id,trashed",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "look",
+      "name": "Look up in Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ids = $('One per Drive file').all();\nconst out = $input.all().map((it, i) => ({ id: ids[i].json.id, exists: it.json.statusCode === 200 && !(it.json.body && it.json.body.trashed) }));\nreturn [{ json: { results: out } }];"
+      },
+      "id": "collect",
+      "name": "Collect results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-APP.vercel.app/api/stays/backup/verify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-cron-secret",
+              "value": "PASTE_AUTOMATION_CRON_SECRET"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "verify",
+      "name": "Report to villa app",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://YOUR-APP.vercel.app/api/stays/backup/export",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-cron-secret",
+              "value": "PASTE_AUTOMATION_CRON_SECRET"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "export",
+      "name": "Get database export",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "name": "=villa-desk-export-{{ $now.format('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_DRIVE_FOLDER_ID"
+        },
+        "options": {}
+      },
+      "id": "save-export",
+      "name": "Save export to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        840,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Every Sunday 03:00": {
+      "main": [
+        [
+          {
+            "node": "Get Drive files to check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get database export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Drive files to check": {
+      "main": [
+        [
+          {
+            "node": "One per Drive file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One per Drive file": {
+      "main": [
+        [
+          {
+            "node": "Look up in Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look up in Drive": {
+      "main": [
+        [
+          {
+            "node": "Collect results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect results": {
+      "main": [
+        [
+          {
+            "node": "Report to villa app",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get database export": {
+      "main": [
+        [
+          {
+            "node": "Save export to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

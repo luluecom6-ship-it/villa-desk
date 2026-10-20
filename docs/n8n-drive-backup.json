@@ -1,0 +1,262 @@
+{
+  "name": "Villa stays: nightly ID copy to Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Villa stays: nightly copy of ID files to Drive\nCopies every new guest ID file to your Google Drive folder and tells the app. The app counts a file as backed up only if the size and checksum of the Drive copy match the original.\n\n**Before activating:**\n1. Replace `YOUR-APP.vercel.app` in the two *villa app* nodes with your app address.\n2. Replace `PASTE_AUTOMATION_CRON_SECRET` in both with `AUTOMATION_CRON_SECRET` from Vercel.\n3. In *Upload to Drive* pick your Google Drive credential and the folder (the folder must be private: owner and manager only, no link sharing).\n4. In *Drive file details* pick the same Google credential.\n5. Turn the workflow **Active**.\n\nRuns every night at 02:00. A healthy confirm reply is `{\"ok\":true}`.",
+        "height": 360,
+        "width": 520
+      },
+      "id": "note-1",
+      "name": "Read me",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "trigger-a",
+      "name": "Every night 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        360,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://YOUR-APP.vercel.app/api/stays/backup/pending",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-cron-secret",
+              "value": "PASTE_AUTOMATION_CRON_SECRET"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "pending",
+      "name": "Get files to copy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "files",
+        "options": {}
+      },
+      "id": "split-a",
+      "name": "One per file",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        840,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.downloadUrl }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "download",
+      "name": "Download from app storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('One per file').item.json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_DRIVE_FOLDER_ID"
+        },
+        "options": {}
+      },
+      "id": "upload",
+      "name": "Upload to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}?fields=id,size,md5Checksum,webViewLink",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "details",
+      "name": "Drive file details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-APP.vercel.app/api/stays/backup/confirm",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-cron-secret",
+              "value": "PASTE_AUTOMATION_CRON_SECRET"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ id: $('One per file').item.json.id, drive_file_id: $json.id, drive_url: $json.webViewLink, size: Number($json.size), md5: $json.md5Checksum }) }}"
+      },
+      "id": "confirm",
+      "name": "Confirm to villa app",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        60
+      ]
+    }
+  ],
+  "connections": {
+    "Every night 02:00": {
+      "main": [
+        [
+          {
+            "node": "Get files to copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get files to copy": {
+      "main": [
+        [
+          {
+            "node": "One per file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One per file": {
+      "main": [
+        [
+          {
+            "node": "Download from app storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download from app storage": {
+      "main": [
+        [
+          {
+            "node": "Upload to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Drive": {
+      "main": [
+        [
+          {
+            "node": "Drive file details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive file details": {
+      "main": [
+        [
+          {
+            "node": "Confirm to villa app",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

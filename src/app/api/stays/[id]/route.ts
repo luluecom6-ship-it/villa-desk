@@ -64,7 +64,7 @@ export async function GET(
       canSeeIds
         ? ctx.supabase
             .from('stay_documents')
-            .select('id, guest_id, side, content_type, size_bytes, uploaded_at')
+            .select('id, guest_id, side, content_type, size_bytes, uploaded_at, archived_at')
             .eq('stay_id', id)
             .is('superseded_at', null)
         : Promise.resolve({ data: [] as unknown[] }),

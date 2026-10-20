@@ -45,7 +45,7 @@ interface Detail {
     ip_address: string | null
     house_rules_versions: { version: number } | { version: number }[] | null
   } | null
-  documents: Array<{ id: string; guest_id: string; side: string; content_type: string; size_bytes: number }>
+  documents: Array<{ id: string; guest_id: string; side: string; content_type: string; size_bytes: number; archived_at?: string | null }>
   reviews?: Array<{ id: string; guest_id: string; action: 'approved' | 'rejected'; reason: string | null; reviewer_name: string | null; created_at: string }>
   messages?: Array<{ message_key: string; due_at: string; status: string; sent_at: string | null; attempts: number; last_error: string | null }>
 }
@@ -140,6 +140,11 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json.url) {
         toast.error(json.error ?? t('toast.documentFailed'))
+        return
+      }
+      if (json.drive) {
+        // Archived: the file now lives only in Drive; the open is logged by the server.
+        window.open(json.url, '_blank', 'noopener,noreferrer')
         return
       }
       setViewer({ url: json.url, contentType: json.content_type ?? '', label })
@@ -399,7 +404,9 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                                       }
                                     >
                                       {openingDoc === d.id ? <Loader2 className="size-3.5 animate-spin" /> : <Eye className="size-3.5" />}
-                                      {d.side === 'back' ? t('drawer.viewBack') : t('drawer.viewFront')}
+                                      {d.archived_at
+                                        ? (d.side === 'back' ? t('drawer.openDriveBack') : t('drawer.openDriveFront'))
+                                        : (d.side === 'back' ? t('drawer.viewBack') : t('drawer.viewFront'))}
                                     </Button>
                                   ))}
                                   {docs.length === 0 && g.is_adult && (

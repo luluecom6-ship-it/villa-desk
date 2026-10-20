@@ -36,7 +36,7 @@ export async function POST(
     // account check both apply; it must belong to this stay and be live.
     const { data: doc } = await ctx.supabase
       .from('stay_documents')
-      .select('id, stay_id, account_id, storage_path, content_type, superseded_at')
+      .select('id, stay_id, account_id, storage_path, content_type, superseded_at, archived_at, drive_url')
       .eq('id', did)
       .eq('stay_id', id)
       .eq('account_id', ctx.accountId)
@@ -51,11 +51,20 @@ export async function POST(
       document_id: did,
       opened_by: ctx.userId,
       opened_role: ctx.role,
-      action: 'signed_url',
+      action: doc.archived_at ? 'drive_open' : 'signed_url',
     })
     if (logError) {
       console.error('document_access_log insert failed', logError.code)
       return NextResponse.json({ error: t('errors.documentUnavailable') }, { status: 503 })
+    }
+
+    // Archived: the Supabase object is gone; the only copy is in Drive (the open is logged above).
+    if (doc.archived_at) {
+      if (!doc.drive_url) return NextResponse.json({ error: t('errors.documentUnavailable') }, { status: 502 })
+      return NextResponse.json(
+        { url: doc.drive_url, drive: true, content_type: doc.content_type, superseded: !!doc.superseded_at },
+        { headers: { 'Cache-Control': 'no-store' } },
+      )
     }
 
     const { data: signed, error: signError } = await admin.storage
