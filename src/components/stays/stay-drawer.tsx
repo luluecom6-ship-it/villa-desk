@@ -501,7 +501,21 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                 {/* Scheduled WhatsApp messages */}
                 <Section title={t('drawer.messages')}>
                   {(detail?.messages ?? []).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t('drawer.messagesNone')}</p>
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">{t('drawer.messagesNone')}</p>
+                      {canIds && stay?.guest_phone && stay.status !== 'cancelled' && stay.status !== 'checked_out' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={resending === 'form_link'}
+                          onClick={() => void resend({ messageKey: 'form_link' }, 'form_link')}
+                        >
+                          {resending === 'form_link' ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                          {t('drawer.sendFormLinkNow')}
+                        </Button>
+                      )}
+                    </div>
                   ) : (
                     <ul className="space-y-1.5 text-sm">
                       {(detail?.messages ?? []).map((m) => (

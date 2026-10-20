@@ -2904,7 +2904,8 @@
       "reviewReason": "Reason: {reason}",
       "reviewBy": "By {name}",
       "markCheckedOut": "Mark as checked out",
-      "checkedOutHelp": "Use this when the guest has left. The record is kept and the mobile number is free for a new booking."
+      "checkedOutHelp": "Use this when the guest has left. The record is kept and the mobile number is free for a new booking.",
+      "sendFormLinkNow": "Send the form link now"
     },
     "cancel": {
       "title": "Cancel this stay?",
