@@ -11,6 +11,7 @@ import {
 } from '@/lib/stays/files'
 import { parseGuestForm } from '@/lib/stays/guest-form'
 import { notifyFormSubmitted } from '@/lib/stays/messaging/form-submitted'
+import { sendFormReceivedMessage } from '@/lib/stays/messaging/form-received'
 import {
   findFormStay,
   FORM_BUCKET,
@@ -351,6 +352,11 @@ export async function POST(
       await notifyFormSubmitted(admin, { accountId: stay.account_id, stayRef, guestName: stay.guest_name ?? null, siteUrl })
     } catch (e) {
       console.error('[stay-form] team alert failed:', (e as { code?: string })?.code ?? 'error')
+    }
+    try {
+      await sendFormReceivedMessage(admin, { accountId: stay.account_id, stayId: stay.id })
+    } catch (e) {
+      console.error('[stay-form] receipt message failed:', (e as { code?: string })?.code ?? 'error')
     }
   })
 
