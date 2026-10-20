@@ -2736,7 +2736,8 @@
       "upcoming": "Upcoming",
       "form_pending": "Form pending",
       "id_pending": "ID not verified",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "deposit_refund": "Deposit to refund"
     },
     "columns": {
       "reference": "Reference",

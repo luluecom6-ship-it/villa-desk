@@ -64,7 +64,8 @@ export interface StayRow {
   updated_at: string
 }
 
-export type StayWithGuests = StayRow & { stay_guests?: StayGuestSummary[] }
+/** `deposit_status` is only attached for owner/admin (caretakers never see deposit data). */
+export type StayWithGuests = StayRow & { stay_guests?: StayGuestSummary[]; deposit_status?: string | null }
 
 /** Why automation is off for a stay, in priority order. */
 export type AutomationOffReason =

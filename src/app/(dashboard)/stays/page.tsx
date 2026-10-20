@@ -136,7 +136,7 @@ export default function StaysPage() {
           role="tablist"
           aria-label={t('filters.label')}
         >
-          {STAY_FILTERS.map((f) => {
+          {STAY_FILTERS.filter((f) => f !== 'deposit_refund' || isAdmin).map((f) => {
             const active = f === filter
             return (
               <button

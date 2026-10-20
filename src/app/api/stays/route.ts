@@ -57,10 +57,18 @@ export async function GET(request: Request) {
     const all = (data ?? []) as StayWithGuests[]
     const now = new Date()
     const includeLink = hasMinRole(ctx.role, 'admin')
+    // Deposit status is owner/admin only: it powers the "Deposit to refund" filter.
+    if (includeLink) {
+      const { data: deps } = await supabaseAdmin().from('deposits').select('stay_id, status').eq('account_id', ctx.accountId)
+      const byStay = new Map((deps ?? []).map((d: { stay_id: string; status: string }) => [d.stay_id, d.status]))
+      for (const s of all) s.deposit_status = byStay.get(s.id) ?? null
+    }
     const stays = filterStays(all, filter, q, now).map((s) =>
       decorateStay(s, { requestUrl: request.url, includeLink, now }),
     )
-    return NextResponse.json({ stays, counts: filterCounts(all, now) })
+    const counts = filterCounts(all, now)
+    if (!includeLink) delete counts.deposit_refund
+    return NextResponse.json({ stays, counts })
   } catch (err) {
     return toErrorResponse(err)
   }

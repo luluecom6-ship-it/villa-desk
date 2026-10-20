@@ -28,6 +28,7 @@ import { AutomationBadge, FormBadge, IdBadge, StatusBadge } from './stay-badges'
 import { StayFormDialog, type SavedStay } from './stay-form-dialog'
 import { StaffIdUpload } from './staff-id-upload'
 import { useCan } from '@/hooks/use-can'
+import { DepositCard } from './deposit-card'
 
 export type DrawerStay = Omit<StayRow, 'form_token'> & {
   automation: AutomationState
@@ -597,6 +598,10 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                       </ul>
                     )}
                   </Section>
+                )}
+
+                {isAdmin && stay.status !== 'cancelled' && stay.status !== 'sample' && (
+                  <DepositCard key={`${stay.id}:${stay.status}`} stayId={stay.id} onChanged={onChanged} />
                 )}
 
                 {canCheckout && (

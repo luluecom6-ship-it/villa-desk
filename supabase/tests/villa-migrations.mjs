@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -502,6 +502,25 @@ await db.exec(`UPDATE food_orders SET status='confirmed', decided_at=now()`);
 await rejects('an order is never deleted', `DELETE FROM food_orders`, /cannot be deleted/);
 ok('caretaker can read the menu and orders', (await count(agent, 'food_items')) === 1 && (await count(agent, 'food_orders')) === 1);
 ok('viewer cannot read the menu or orders', (await count(viewer, 'food_items')) === 0 && (await count(viewer, 'food_orders')) === 0);
+
+// ---- Migration 064: deposits -----------------------------------------------------------
+const sDep = await future(acct, prop, '919666000064');
+const saveDep = (vals, who = admin) => one(`SELECT public.save_deposit('${acct}','${sDep.id}','${who}','Tester','${JSON.stringify(vals)}'::jsonb) AS d`);
+await saveDep({ status: 'held', amount: 5000, mode: 'upi', received_at: '2026-10-20T10:00:00Z' });
+ok('deposit saved once per stay', (await one(`SELECT count(*)::int n FROM deposits WHERE stay_id='${sDep.id}'`)).n === 1);
+await saveDep({ status: 'held', amount: 6000, mode: 'upi', received_at: '2026-10-20T10:00:00Z' });
+ok('a second save updates the same row and is audited with old and new', (await one(`SELECT count(*)::int n FROM deposits WHERE stay_id='${sDep.id}'`)).n === 1
+  && (await one(`SELECT count(*)::int n FROM deposit_audit WHERE stay_id='${sDep.id}'`)).n === 2
+  && Number((await one(`SELECT (old_values->>'amount')::numeric a FROM deposit_audit WHERE stay_id='${sDep.id}' ORDER BY created_at DESC, id LIMIT 1`)).a) >= 0);
+ok('the audit row names who changed it', (await one(`SELECT count(*)::int n FROM deposit_audit WHERE stay_id='${sDep.id}' AND changed_by_name='Tester'`)).n === 2);
+await rejects('a deduction cannot exceed the deposit', `UPDATE deposits SET deducted_amount = 99999, deduction_reason='x' WHERE stay_id='${sDep.id}'`, /check/i);
+await rejects('a deduction needs a reason', `UPDATE deposits SET deducted_amount = 100 WHERE stay_id='${sDep.id}'`, /check/i);
+await db.exec(`UPDATE stays SET status='checked_out' WHERE id='${sDep.id}'`);
+ok('checking out moves a held deposit to refund due', (await one(`SELECT status FROM deposits WHERE stay_id='${sDep.id}'`)).status === 'refund_due');
+await rejects('a deposit is never deleted', `DELETE FROM deposits WHERE stay_id='${sDep.id}'`, /cannot be deleted/);
+await rejects('the audit trail cannot be edited', `UPDATE deposit_audit SET action='created'`, /immutable/);
+ok('admin can read deposits', (await count(admin, 'deposits')) === 1);
+ok('caretaker and viewer cannot read deposit amounts', (await count(agent, 'deposits')) === 0 && (await count(viewer, 'deposits')) === 0 && (await count(agent, 'deposit_audit')) === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

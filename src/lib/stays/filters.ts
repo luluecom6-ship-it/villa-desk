@@ -5,7 +5,7 @@ import { istDayBounds } from './time'
 // list route fetches the account's stays once and filters here: one pure,
 // testable definition shared by the API and (later) the Today view.
 //
-// "Deposit to refund" joins in M4, when the deposits table exists.
+// "Deposit to refund" needs the deposit status, which the list route attaches for owner/admin only.
 
 export const STAY_FILTERS = [
   'all',
@@ -15,6 +15,7 @@ export const STAY_FILTERS = [
   'upcoming',
   'form_pending',
   'id_pending',
+  'deposit_refund',
   'cancelled',
 ] as const
 export type StayFilter = (typeof STAY_FILTERS)[number]
@@ -66,6 +67,8 @@ export function matchesFilter(
       const s = idStatus(stay)
       return s === 'none' || s === 'pending' || s === 'rejected'
     }
+    case 'deposit_refund':
+      return stay.deposit_status === 'refund_due' && stay.status !== 'cancelled'
     case 'cancelled':
       return stay.status === 'cancelled'
   }
