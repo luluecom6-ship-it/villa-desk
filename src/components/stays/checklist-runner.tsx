@@ -57,11 +57,15 @@ export function ChecklistRunner({ stayId, kind, open, onClose, onChanged }: { st
   const left = run ? unanswered(run.template_snapshot, run.answers).length : 0
 
   async function save(item: ChecklistItem, answer: Record<string, unknown>) {
-    setBusy(item.key)
+    // Show the change at once; the server saves in the background and we roll back only if it refuses.
+    const before = run
+    setRun((r) => (r ? { ...r, answers: { ...r.answers, [item.key]: { ...r.answers[item.key], ...(answer as Answers[string]) } } } : r))
     const res = await fetch(`/api/stays/${stayId}/checklists/${kind}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: item.key, answer }) })
-    setBusy(null)
-    if (!res.ok) { toast.error(ERR[(await res.json().catch(() => ({}))).error] ?? 'Could not save.'); return false }
-    await load()
+    if (!res.ok) {
+      setRun(before)
+      toast.error(ERR[(await res.json().catch(() => ({}))).error] ?? 'Could not save.')
+      return false
+    }
     return true
   }
   async function finish() {
@@ -82,7 +86,9 @@ export function ChecklistRunner({ stayId, kind, open, onClose, onChanged }: { st
     const res = await fetch(`/api/stays/${stayId}/checklists/${kind}/photos`, { method: 'POST', body: fd })
     setBusy(null)
     if (!res.ok) { toast.error(ERR[(await res.json().catch(() => ({}))).error] ?? 'Could not upload the photo.'); return }
-    await load()
+    const j = await res.json().catch(() => null)
+    if (j?.photo_id) setRun((r) => (r ? { ...r, photos: { ...r.photos, [uploadKey]: [...(r.photos[uploadKey] ?? []), j.photo_id] } } : r))
+    else await load()
   }
 
   return (
@@ -107,8 +113,8 @@ export function ChecklistRunner({ stayId, kind, open, onClose, onChanged }: { st
                         <p className="text-sm font-medium">{it.label}</p>
                         {it.type === 'check' ? (
                           <div className="mt-2 flex gap-2">
-                            <Button type="button" size="sm" variant={a?.status === 'ok' ? 'default' : 'outline'} disabled={locked || busy === it.key} onClick={() => void save(it, { status: 'ok', note: '' })}><Check className="mr-1 size-4" />OK</Button>
-                            <Button type="button" size="sm" variant={issue ? 'destructive' : 'outline'} disabled={locked || busy === it.key} onClick={() => { if (!issue) setNotes((n) => ({ ...n, [it.key]: n[it.key] ?? '' })); void save(it, { status: 'issue', note: notes[it.key] || a?.note || 'Issue' }) }}><TriangleAlert className="mr-1 size-4" />Issue</Button>
+                            <Button type="button" size="sm" variant={a?.status === 'ok' ? 'default' : 'outline'} disabled={locked} onClick={() => void save(it, { status: 'ok', note: '' })}><Check className="mr-1 size-4" />OK</Button>
+                            <Button type="button" size="sm" variant={issue ? 'destructive' : 'outline'} disabled={locked} onClick={() => { if (!issue) setNotes((n) => ({ ...n, [it.key]: n[it.key] ?? '' })); void save(it, { status: 'issue', note: notes[it.key] || a?.note || 'Issue' }) }}><TriangleAlert className="mr-1 size-4" />Issue</Button>
                           </div>
                         ) : (
                           <Input className="mt-2" type="number" inputMode="decimal" disabled={locked} placeholder="Reading" defaultValue={a?.reading ?? ''}
