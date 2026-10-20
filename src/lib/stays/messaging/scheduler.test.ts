@@ -143,6 +143,21 @@ describe('conditions at send time', () => {
     expect(transport).not.toHaveBeenCalled()
   })
 
+  it('a message that needs a missing villa detail waits and the owner is told, once', async () => {
+    db.tables.properties[0].access_instructions = ''
+    db.tables.stay_guests = [{ stay_id: 's1', is_adult: true, id_verified_at: '2026-11-10T01:00:00Z' }]
+    await run(ist('2026-11-10 09:05'))
+    await run(ist('2026-11-10 09:06'))
+    expect(msg('access_details').status).toBe('queued')
+    expect(msg('access_details').last_error).toBe('property_details_missing')
+    expect(transport.mock.calls.some((c) => (c[0].text as string).includes('how to get in'))).toBe(false)
+    const bells = (db.tables.notifications ?? []).filter((n) => String(n.title).startsWith('Villa details missing'))
+    expect(bells.map((n) => n.user_id)).toEqual(['u-owner'])
+    db.tables.properties[0].access_instructions = 'WiFi: villa / pass123. Gate code 1234.'
+    await run(ist('2026-11-10 09:10'))
+    expect(msg('access_details').status).toBe('sent')
+  })
+
   it('access details need verified IDs; the staff alert goes to owners and admins only', async () => {
     db.tables.stay_guests = [{ stay_id: 's1', is_adult: true, id_verified_at: null }]
     await run(ist('2026-11-09 17:05'))

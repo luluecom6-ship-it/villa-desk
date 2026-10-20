@@ -19,6 +19,7 @@ import { useTranslations } from 'next-intl';
 import { SettingsPanelHead } from './settings-panel-head';
 import { BrowserNotificationsCard } from './browser-notifications-card';
 import { GuestAlertsCard } from './guest-alerts-card';
+import { VillaDetailsCard } from './villa-details-card';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -359,6 +360,9 @@ export function ProfileForm() {
           Save button — flipping the switch applies immediately. */}
       <div className="mt-6">
         <GuestAlertsCard />
+      </div>
+      <div className="mt-6">
+        <VillaDetailsCard />
       </div>
       <BrowserNotificationsCard className="mt-6" />
     </section>

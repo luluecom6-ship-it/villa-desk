@@ -117,6 +117,50 @@ export function buildValues(
   }
 }
 
+/** The villa detail a message cannot go out without (null when it has everything). */
+export function missingPropertyDetail(key: MessageKey, property: PropertyRow | undefined): string | null {
+  const need: Partial<Record<MessageKey, keyof PropertyRow>> = {
+    arrival_info: 'address',
+    access_details: 'access_instructions',
+    arrival_check: 'caretaker_phone',
+    checkout_reminder: 'caretaker_phone',
+    review_request: 'review_url',
+  }
+  const field = need[key]
+  if (!field) return null
+  const v = property?.[field]
+  return typeof v === 'string' && v.trim() ? null : field
+}
+
+const FIELD_LABEL: Record<string, string> = {
+  address: 'the address',
+  access_instructions: 'the WiFi and lock / gate details',
+  caretaker_phone: "the caretaker's phone number",
+  review_url: 'the review link',
+}
+
+/** One bell per kind of missing detail per 12 hours, to the owner and admins. */
+async function alertMissingDetail(db: SupabaseClient, accountId: string, key: MessageKey, field: string, now: Date): Promise<void> {
+  try {
+    const title = `Villa details missing: ${FIELD_LABEL[field] ?? field}`
+    const since = new Date(now.getTime() - 12 * 3_600_000).toISOString()
+    const { data: dup } = await db.from('notifications').select('id').eq('account_id', accountId).eq('title', title).gte('created_at', since).limit(1)
+    if (dup && dup.length > 0) return
+    const { data: admins } = await db.from('profiles').select('user_id').eq('account_id', accountId).in('account_role', ['owner', 'admin'])
+    const rows = (admins ?? []).map((a: { user_id: string }) => ({
+      account_id: accountId,
+      user_id: a.user_id,
+      type: 'stay_alert',
+      created_at: now.toISOString(),
+      title,
+      body: `A guest message (${key.replace(/_/g, ' ')}) is waiting because ${FIELD_LABEL[field] ?? field} is not set. Add it in Settings → Villa details; the message then goes out by itself.`.slice(0, 300),
+    }))
+    if (rows.length > 0) await db.from('notifications').insert(rows)
+  } catch {
+    /* best effort */
+  }
+}
+
 // ---------------------------------------------------------------- enqueue
 
 export async function enqueueStayMessages(db: SupabaseClient, now: Date): Promise<number> {
@@ -307,6 +351,15 @@ export async function runStayScheduler(
     }
 
     const property = propById.get(stay.property_id)
+    // Never send a guest message with a hole in it ("Here is how to get in: "): keep it queued and
+    // tell the team to fill in the villa details. It goes out by itself once they are saved.
+    const missing = missingPropertyDetail(row.message_key, property)
+    if (missing) {
+      await finish('queued', { last_error: 'property_details_missing' })
+      await alertMissingDetail(db, row.account_id, row.message_key, missing, now)
+      summary.waiting++
+      continue
+    }
     const values = buildValues(stay, property, options.requestUrl)
     const override = tplByKey.get(`${row.account_id}:${row.message_key}`)
     const text = renderTemplate(override?.body ?? DEFAULT_TEMPLATES[row.message_key], values)
