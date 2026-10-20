@@ -87,3 +87,44 @@ export function unknownVariables(body: string): string[] {
 export function firstName(full: string): string {
   return (full ?? '').trim().split(/\s+/)[0] ?? ''
 }
+
+/** Variables a message must keep, or it is useless to the guest. */
+export const REQUIRED_VARIABLES: Partial<Record<MessageKey, TemplateVariable>> = {
+  form_link: 'form_url',
+  form_reminder_3d: 'form_url',
+  form_reminder_2d: 'form_url',
+  form_reminder_1d: 'form_url',
+  access_details: 'access_instructions',
+  review_request: 'review_url',
+}
+
+export type TemplateCheck = { ok: true; body: string } | { ok: false; error: 'empty' | 'tooLong' | 'unknownVariable' | 'missingVariable'; detail?: string }
+
+/** Validate wording an admin typed in the editor. */
+export function checkTemplateBody(key: MessageKey, raw: unknown): TemplateCheck {
+  const body = String(raw ?? '').replace(/\r\n/g, '\n').trim()
+  if (body.length === 0) return { ok: false, error: 'empty' }
+  if (body.length > 2000) return { ok: false, error: 'tooLong' }
+  const unknown = unknownVariables(body)
+  if (unknown.length > 0) return { ok: false, error: 'unknownVariable', detail: unknown.map((u) => `{${u}}`).join(', ') }
+  const need = REQUIRED_VARIABLES[key]
+  if (need && !body.includes(`{${need}}`)) return { ok: false, error: 'missingVariable', detail: `{${need}}` }
+  return { ok: true, body }
+}
+
+/** Example values for the editor's live preview. */
+export const SAMPLE_VALUES: TemplateValues = {
+  guest_first_name: 'Asha',
+  stay_ref: 'MS-2026-001',
+  form_url: 'https://your-app.vercel.app/stay/abc123',
+  property_name: 'Mahinoor Stays',
+  address: '12 Lake View Road, Bengaluru',
+  map_url: 'https://maps.app.goo.gl/example',
+  directions: 'Second gate on the left.',
+  checkin_time: '2:00 PM',
+  checkout_time: '11:00 AM',
+  access_instructions: 'WiFi: Villa-Guest / password 12345. Lockbox code 4821.',
+  caretaker_phone: '+91 98xxxxxx00',
+  review_url: 'https://g.page/r/example',
+  refund_days: '7',
+}
