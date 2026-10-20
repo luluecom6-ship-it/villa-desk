@@ -405,7 +405,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                                     <span className="text-xs text-muted-foreground">{t('drawer.noIdFile')}</span>
                                   )}
                                 </div>
-                                {isAdmin && g.is_adult && docs.some((d) => d.side === 'front') && (
+                                {canIds && g.is_adult && docs.some((d) => d.side === 'front') && (
                                   rejectFor === g.id ? (
                                     <div className="space-y-2">
                                       <Input

@@ -25,7 +25,7 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   Store only the last 4 characters of an ID number, never the full number.
 - **Roles:** use the existing `requireRole()` on the server and `is_account_member()` in
   RLS. Owner decision (migration 054): caretakers (agent) MAY view ID images and attach an ID on
-  a guest's behalf (both logged); only admin/owner verify or reject IDs and read the access log.
+  a guest's behalf (both logged). Owner decision 20 Oct 2026: caretakers ALSO approve / reject IDs (owner is often away; verify route is `requireRole('agent')`, uses the service client); only admin/owner read the access log.
   Caretakers must never see deposit amounts. Viewers see no ID files.
 - **Logs** never contain ID numbers, file contents or full phone numbers.
 - **Time zone** is Asia/Kolkata; no send window (removed 18 Oct 2026); daily limit still applies.

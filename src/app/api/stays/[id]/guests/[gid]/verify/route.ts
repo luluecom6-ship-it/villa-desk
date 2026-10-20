@@ -9,7 +9,9 @@ export const maxDuration = 60
 const t = getT('Stays')
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// Staff ID review (PDR 6.5). Admin and above.
+// Staff ID review (PDR 6.5). Caretakers (agent) and above (owner decision 20 Oct 2026: the
+// owner is often away, so caretakers approve / reject too). Runs with the service client
+// because RLS only lets admins update guests; every query is pinned to the caller's account.
 //   { action: 'verify' }                 needs a live front image on file
 //   { action: 'reject', reason: '...' }  the guest is asked to resubmit
 // Verified and rejected are mutually exclusive (database constraint). A new
@@ -20,7 +22,7 @@ export async function POST(
 ) {
   let ctx
   try {
-    ctx = await requireRole('admin')
+    ctx = await requireRole('agent')
   } catch (err) {
     return toErrorResponse(err)
   }
@@ -44,7 +46,8 @@ export async function POST(
   }
 
   try {
-    const { data: guest } = await ctx.supabase
+    const db = supabaseAdmin()
+    const { data: guest } = await db
       .from('stay_guests')
       .select('id')
       .eq('id', gid)
@@ -54,7 +57,7 @@ export async function POST(
     if (!guest) return NextResponse.json({ error: t('errors.notFound') }, { status: 404 })
 
     if (action === 'verify') {
-      const { data: front } = await ctx.supabase
+      const { data: front } = await db
         .from('stay_documents')
         .select('id')
         .eq('guest_id', gid)
@@ -72,7 +75,7 @@ export async function POST(
         ? { id_verified_at: now, id_verified_by: ctx.userId, id_rejected_at: null, id_reject_reason: null }
         : { id_verified_at: null, id_verified_by: null, id_rejected_at: now, id_reject_reason: reason }
 
-    const { data, error } = await ctx.supabase
+    const { data, error } = await db
       .from('stay_guests')
       .update(patch)
       .eq('id', gid)
@@ -86,7 +89,7 @@ export async function POST(
     // Permanent history of who decided what and why (migration 059). A failed write
     // must not undo the review itself; it is logged and the review stands.
     try {
-      const admin = supabaseAdmin()
+      const admin = db
       const { data: me } = await admin.from('profiles').select('full_name').eq('user_id', ctx.userId).maybeSingle()
       const { error: histErr } = await admin.from('stay_id_reviews').insert({
         account_id: ctx.accountId,
