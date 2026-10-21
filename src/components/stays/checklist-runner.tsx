@@ -156,7 +156,7 @@ export function PhotoLink({ id }: { id: string }) {
     const res = await fetch(`/api/checklist-photos/${id}/url`, { method: 'POST', cache: 'no-store' })
     const j = res.ok ? await res.json() : null
     if (j?.url) window.open(j.url, '_blank', 'noopener')
-    else toast.error('Could not open the photo.')
+    else toast.error(res.status === 410 ? 'This photo was deleted (older than 90 days).' : 'Could not open the photo.')
   }
   return <button type="button" onClick={() => void open()} className="rounded border px-2 py-0.5 text-xs underline">View photo</button>
 }

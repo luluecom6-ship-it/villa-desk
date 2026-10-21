@@ -55,7 +55,7 @@ const end = m017.indexOf('GRANT EXECUTE ON FUNCTION is_account_member');
 await db.exec(m017.slice(start, end).replace(/ALTER FUNCTION[^;]+;/, ''));
 
 // --- Apply 047-051 twice (idempotency) ------------------------------
-const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66|67|68)_/.test(f)).sort();
+const files = fs.readdirSync(MIG).filter(f => /^0(47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66|67|68|69)_/.test(f)).sort();
 console.log('migrations:', files.join(', '));
 for (const pass_ of [1, 2]) {
   for (const f of files) {
@@ -600,6 +600,19 @@ await rejects('paid needs a paid time', `UPDATE food_orders SET payment_status='
 await db.exec(`UPDATE food_orders SET payment_status='paid', paid_at=now()`);
 ok('an order can be marked paid', (await one(`SELECT payment_status FROM food_orders LIMIT 1`)).payment_status === 'paid');
 await rejects('an unknown payment status is refused', `UPDATE food_orders SET payment_status='refunded', paid_at=NULL`, /food_orders_payment_check|check/i);
+
+// ---- Migration 069: checklist photo purges ---------------------------------------------
+{
+  const st = (await one(`SELECT id FROM stays LIMIT 1`)).id;
+  await db.exec(`INSERT INTO checklist_photos(account_id, stay_id, run_id, damage_id, storage_path, content_type, size_bytes, sha256) SELECT '${acct}','${st}', NULL, NULL, 'x', 'image/jpeg', 10, repeat('a',64) WHERE false`);
+  const dr = await one(`INSERT INTO damage_reports(account_id, stay_id, title) VALUES ('${acct}','${st}','Broken glass') RETURNING id`);
+  const ph = await one(`INSERT INTO checklist_photos(account_id, stay_id, damage_id, storage_path, content_type, size_bytes, sha256) VALUES ('${acct}','${st}','${dr.id}','p069','image/jpeg',100,repeat('a',64)) RETURNING id`);
+  await db.exec(`INSERT INTO checklist_photo_purges(account_id, stay_id, photo_id, size_bytes) VALUES ('${acct}','${st}','${ph.id}',100)`);
+  ok('a photo purge can be logged', (await one(`SELECT count(*)::int AS n FROM checklist_photo_purges`)).n === 1);
+  await rejects('a photo can only be purged once', `INSERT INTO checklist_photo_purges(account_id, stay_id, photo_id, size_bytes) VALUES ('${acct}','${st}','${ph.id}',100)`, /uq_checklist_photo_purges_photo|duplicate/i);
+  await rejects('purge log rows cannot be changed', `UPDATE checklist_photo_purges SET size_bytes=1`, /immutable|not allowed|append|forbid|cannot/i);
+  await rejects('purge log rows cannot be deleted', `DELETE FROM checklist_photo_purges`, /immutable|not allowed|append|forbid|cannot|never/i);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
