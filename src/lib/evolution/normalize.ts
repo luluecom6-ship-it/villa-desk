@@ -158,6 +158,14 @@ export function normalizeUpsert(dataIn: unknown): Normalized {
     const rid = isObj(r.singleSelectReply) ? str(r.singleSelectReply.selectedRowId) : null;
     if (rid) return { ...base, type: "reply", text: str(r.title) ?? rid, reply: { id: rid, title: str(r.title) ?? rid } };
   }
+  // Business messages (templates, buttons, lists, interactive): show the text they carry.
+  const tpl = isObj(m.templateMessage) ? (isObj(m.templateMessage.hydratedTemplate) ? m.templateMessage.hydratedTemplate : isObj(m.templateMessage.hydratedFourRowTemplate) ? m.templateMessage.hydratedFourRowTemplate : null) : null
+  const businessText =
+    (tpl && (str(tpl.hydratedContentText) ?? str(tpl.hydratedTitleText))) ??
+    (isObj(m.buttonsMessage) ? str(m.buttonsMessage.contentText) : null) ??
+    (isObj(m.listMessage) ? str(m.listMessage.description) ?? str(m.listMessage.title) : null) ??
+    (isObj(m.interactiveMessage) && isObj(m.interactiveMessage.body) ? str(m.interactiveMessage.body.text) : null);
+  if (businessText) return { ...base, type: "text", text: businessText };
   if (isObj(m.contactMessage)) return { ...base, type: "contact", text: `[Contact] ${str(m.contactMessage.displayName) ?? ""}`.trim() };
   if (isObj(m.contactsArrayMessage)) return { ...base, type: "contact", text: "[Contacts]" };
   return { ...base, type: "unknown", text: `[Unsupported message type: ${base.rawType}]` };

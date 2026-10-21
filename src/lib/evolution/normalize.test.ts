@@ -99,3 +99,15 @@ describe('wrapped messages', () => {
     expect(r).toMatchObject({ kind: 'message', type: 'text', text: 'fixed text' })
   })
 })
+
+describe('business messages', () => {
+  const key = { id: 'B1', remoteJid: '919000011111@s.whatsapp.net', fromMe: false }
+  it('reads the text of a template message', () => {
+    expect(normalizeUpsert({ key, message: { templateMessage: { hydratedTemplate: { hydratedContentText: 'Your order is ready' } } } })).toMatchObject({ type: 'text', text: 'Your order is ready' })
+  })
+  it('reads buttons, list and interactive bodies', () => {
+    expect(normalizeUpsert({ key, message: { buttonsMessage: { contentText: 'Choose one' } } })).toMatchObject({ text: 'Choose one' })
+    expect(normalizeUpsert({ key, message: { listMessage: { description: 'Pick a room' } } })).toMatchObject({ text: 'Pick a room' })
+    expect(normalizeUpsert({ key, message: { interactiveMessage: { body: { text: 'Tap below' } } } })).toMatchObject({ text: 'Tap below' })
+  })
+})
