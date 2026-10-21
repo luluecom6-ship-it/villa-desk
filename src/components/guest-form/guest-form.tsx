@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { formatIst } from '@/lib/stays/time'
 import { MAX_REQUEST_BYTES } from '@/lib/stays/files'
 import {
+  isAdultAge,
   ID_TYPES,
   MAX_OCCUPANTS,
   PURPOSES,
@@ -153,7 +154,7 @@ export function GuestForm({ token }: { token: string }) {
     const keys = ['lead']
     for (const o of occupants) {
       const age = Number(o.age)
-      if (String(o.age).trim() !== '' && Number.isInteger(age)) keys.push(o.client_key)
+      if (String(o.age).trim() !== '' && Number.isInteger(age) && isAdultAge(age)) keys.push(o.client_key)
     }
     return keys
   }, [occupants])
@@ -628,7 +629,7 @@ export function GuestForm({ token }: { token: string }) {
 
           {occupants.map((o, i) => {
             const age = Number(o.age)
-            const isAdult = String(o.age).trim() !== '' && Number.isInteger(age)
+            const isAdult = String(o.age).trim() !== '' && Number.isInteger(age) && isAdultAge(age)
             const p = `occupants.${i}`
             return (
               <div key={o.client_key} className="space-y-4 rounded-xl border border-border p-3">

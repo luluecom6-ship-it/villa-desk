@@ -11,7 +11,8 @@ export type IdType = (typeof ID_TYPES)[number]
 export const PURPOSES = ['leisure', 'business', 'family', 'event', 'other'] as const
 
 export const MAX_OCCUPANTS = 12
-export const ADULT_AGE = 18
+/** Guests of this age or older must give an ID (owner decision 21 Oct 2026); younger children need none. */
+export const ADULT_AGE = 15
 
 export type GuestFormErrorKey =
   | 'required'
@@ -212,9 +213,8 @@ export function parseGuestForm(raw: unknown, ctx: ParseContext): GuestFormResult
     const occMobile = phone(o.mobile)
     if (!occMobile.ok) errors[`${p}.mobile`] = 'invalidPhone'
 
-    // Owner decision 21 Oct 2026: every guest, children included, gives an ID type, last 4 and a front photo (back optional).
-    // `is_adult` therefore means "an ID is required" (true for everyone with a valid age); the real age is stored as `age`.
-    const adult = Number.isInteger(age) && ageText !== ''
+    // `is_adult` means "an ID is required" (age 15 or older, ADULT_AGE); the real age is stored as `age`.
+    const adult = Number.isInteger(age) && ageText !== '' && isAdultAge(age)
     let id_type = ''
     let id_last4 = ''
     if (adult) {

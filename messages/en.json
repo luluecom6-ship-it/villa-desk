@@ -3061,13 +3061,13 @@
     },
     "occupants": {
       "title": "Other guests",
-      "hint": "Your booking is for {count, plural, one {# guest} other {# guests}}. Add everyone staying, including children. Every guest needs a photo ID (front is required, back is optional).",
+      "hint": "Your booking is for {count, plural, one {# guest} other {# guests}}. Add everyone staying, including children. Every guest aged 15 or over needs a photo ID (front is required, back is optional).",
       "guestN": "Guest {n}",
       "name": "Full name",
       "age": "Age",
       "add": "Add a guest",
       "remove": "Remove",
-      "childNote": "No ID is needed for guests under 18.",
+      "childNote": "No ID is needed for guests under 15.",
       "mobile": "Mobile (optional)"
     },
     "rules": {
