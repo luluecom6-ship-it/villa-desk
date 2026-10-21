@@ -94,6 +94,7 @@ export const HELP_TEXT = [
   'decline reason  decline the food order (the reason is sent to the guest)',
   '/close  finish the chat (stop reminders)',
   '/transfer Sara  give the chat to another person',
+  'Register New  get a form to register a new stay (copy, fill, send back)',
   '/info  guest and stay details',
   '/list  your open chats',
   '/off  stop receiving chats  |  /on  start again',

@@ -190,10 +190,12 @@ export function StayFormDialog({ open, onOpenChange, stay, onSaved }: Props) {
             <p className="font-mono text-lg font-semibold">{saved.stay_ref}</p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>{t('created.formLink')}</Label>
-            <Input readOnly value={saved.form_url ?? ''} onFocus={(e) => e.currentTarget.select()} />
-          </div>
+          {saved.form_url && (
+            <div className="space-y-1.5">
+              <Label>{t('created.formLink')}</Label>
+              <Input readOnly value={saved.form_url} onFocus={(e) => e.currentTarget.select()} />
+            </div>
+          )}
 
           <p className="text-sm text-muted-foreground">
             {saved.automation.on ? t('created.automationOn') : t('created.automationOff')}

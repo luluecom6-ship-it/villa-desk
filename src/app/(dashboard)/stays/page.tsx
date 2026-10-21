@@ -36,6 +36,7 @@ export default function StaysPage() {
   const t = useTranslations('Stays')
   // Admin and above can create and edit registrations (PDR section 2).
   const isAdmin = useCan('edit-settings')
+  const canRegister = useCan('send-messages')
 
   const [filter, setFilter] = useState<StayFilter>('all')
   const [search, setSearch] = useState('')
@@ -109,7 +110,7 @@ export default function StaysPage() {
           <Link href="/stays/damage" className="inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted sm:w-auto">
             Damage reports
           </Link>
-          {isAdmin && (
+          {canRegister && (
             <Button onClick={() => setNewOpen(true)} className="w-full sm:w-auto">
               <Plus className="size-4" />
               {t('newRegistration')}

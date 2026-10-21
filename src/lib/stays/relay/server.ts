@@ -9,6 +9,8 @@ import { sendMessageToConversation } from '@/lib/whatsapp/send-message'
 import { loadResponders } from '../escalation/server'
 import { decideOrder } from '../food/server'
 import type { Responder } from '../escalation/plan'
+import { isRegisterRequest, looksLikeRegisterForm, REGISTER_TEMPLATE } from '../register/logic'
+import { registerFromWhatsApp } from '../register/server'
 import { HELP_TEXT, forwardText, maskPhone, orderAnswerFromReply, parseAgentMessage, type GuestCard } from './logic'
 
 // Agent relay, database + WhatsApp side. Rules live in ./logic.ts.
@@ -323,6 +325,19 @@ export async function onAgentMessage(
   if (cmd.kind === 'list') {
     await tell(db, accountId, phone, await listText(db, accountId, agent))
     return 'agent_list'
+  }
+
+  // "Register New" -> form; a filled-in form -> new stay. Only plain text that is not a swipe-reply to a guest.
+  if (cmd.kind === 'reply' && !msg.hasMedia && !msg.quotedId && !cmd.code) {
+    if (isRegisterRequest(msg.text)) {
+      await tell(db, accountId, phone, REGISTER_TEMPLATE)
+      return 'agent_register_form'
+    }
+    if (/^\s*register\b/i.test(msg.text ?? '') && looksLikeRegisterForm(msg.text)) {
+      const r = await registerFromWhatsApp(db, { accountId, userId: agent.userId, text: msg.text ?? '', siteUrl: args.siteUrl, now: args.now })
+      await tell(db, accountId, phone, r.reply)
+      return r.created ? 'agent_register_ok' : 'agent_register_failed'
+    }
   }
 
   const conversationId = await targetConversation(db, accountId, agent, msg, cmd.code)

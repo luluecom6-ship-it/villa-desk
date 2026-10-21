@@ -30,7 +30,7 @@ const t = getT('Stays')
 //
 // GET   any member. RLS scopes to the caller's account; caretakers (agent)
 //       and viewers can read stays but never receive the guest-form link.
-// POST  admin and above. Saving generates the Stay Reference and form token
+// POST  caretakers and above (writes use the service client). Saving generates the Stay Reference and form token
 //       in the database; a registration without a mobile is stored as Draft
 //       with automation off.
 
@@ -77,7 +77,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let ctx
   try {
-    ctx = await requireRole('admin')
+    // Caretakers (agent) may register stays too; their writes go through the service client after this check.
+    ctx = await requireRole('agent')
   } catch (err) {
     return toErrorResponse(err)
   }
@@ -98,18 +99,19 @@ export async function POST(request: Request) {
     )
   }
   const input = parsed.value
+  const db = supabaseAdmin()
 
   try {
-    const propertyId = await ensureProperty(ctx)
+    const propertyId = await ensureProperty({ ...ctx, supabase: db })
 
     const contactId = input.guest_phone
-      ? await linkContact(ctx.supabase, ctx, input.guest_phone, input.guest_name)
+      ? await linkContact(db, ctx, input.guest_phone, input.guest_name)
       : null
 
     // stay_ref, form_token and the draft/registered status are assigned by
     // the database trigger; nothing here lets the client choose them.
     const insertStay = () =>
-      ctx.supabase
+      db
         .from('stays')
         .insert({
           account_id: ctx.accountId,
@@ -124,7 +126,7 @@ export async function POST(request: Request) {
 
     // Returning guest whose last stay is over but never marked checked out.
     if (isLivePhoneConflict(error) && input.guest_phone) {
-      const closed = await closeFinishedStays(ctx.supabase, ctx.accountId, input.guest_phone)
+      const closed = await closeFinishedStays(db, ctx.accountId, input.guest_phone)
       if (closed > 0) ({ data, error } = await insertStay())
     }
 
@@ -142,7 +144,7 @@ export async function POST(request: Request) {
     // when a booking is modified) but flagged, per PDR section 11.
     const warnings: string[] = []
     if (input.external_booking_ref) {
-      const { count } = await ctx.supabase
+      const { count } = await db
         .from('stays')
         .select('id', { count: 'exact', head: true })
         .eq('account_id', ctx.accountId)
@@ -182,7 +184,7 @@ export async function POST(request: Request) {
       {
         stay: decorateStay(data as StayWithGuests, {
           requestUrl: request.url,
-          includeLink: true,
+          includeLink: hasMinRole(ctx.role, 'admin'),
         }),
         warnings,
       },

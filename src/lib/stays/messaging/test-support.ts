@@ -27,6 +27,7 @@ class Q {
   update(p: Row) { this.mode = 'update'; this.patch = p; return this }
   insert(rows: Row | Row[]) { this.mode = 'insert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this }
   upsert(rows: Row | Row[], o: { ignoreDuplicates?: boolean }) { this.mode = 'upsert'; this.payload = Array.isArray(rows) ? rows : [rows]; this.ignoreDup = !!o.ignoreDuplicates; return this }
+  single() { return this.run().then((r) => ({ data: r.data?.[0] ?? null, error: r.data?.[0] ? r.error : (r.error ?? { message: 'no rows' }) })) }
   maybeSingle() { return this.run().then((r) => ({ data: r.data?.[0] ?? null, error: r.error })) }
   then(a?: (v: { data: any; error: any }) => unknown, b?: (e: unknown) => unknown) { return this.run().then(a, b) }
   private async run() {
@@ -35,7 +36,7 @@ class Q {
       const made: Row[] = []
       for (const p of this.payload) {
         if (this.mode === 'upsert' && rows.some((r) => ('message_id' in p ? r.conversation_id === p.conversation_id && r.message_id === p.message_id : r.stay_id === p.stay_id && r.message_key === p.message_key))) continue
-        const row = { id: `${this.table}-${++this.db.seq}`, updated_at: new Date(0).toISOString(), attempts: 0, ...(this.table === 'food_orders' ? { status: 'pending', order_no: this.db.seq } : {}), ...p }
+        const row = { id: `${this.table}-${++this.db.seq}`, updated_at: new Date(0).toISOString(), attempts: 0, ...(this.table === 'food_orders' ? { status: 'pending', order_no: this.db.seq } : {}), ...(this.table === 'stays' ? { stay_ref: `MS-2026-${String(this.db.seq).padStart(3, '0')}` } : {}), ...p }
         rows.push(row)
         made.push(row)
       }

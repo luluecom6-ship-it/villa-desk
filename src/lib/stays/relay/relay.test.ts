@@ -12,6 +12,8 @@ const m = vi.hoisted(() => ({
 vi.mock('@/lib/evolution/server', () => ({ loadEvolutionConfig: async () => ({ account_id: 'a', state: 'open' }), connFromRow: () => ({}) }))
 vi.mock('@/lib/evolution/safety-server', () => ({ sendGate: async () => null, recordSend: async () => undefined }))
 vi.mock('@/lib/evolution/client', () => ({ sendText: m.sendText, sendMedia: m.sendMedia, sendAudio: m.sendAudio, sendReaction: m.sendReaction, userJid: (n: string) => `${n}@s.whatsapp.net` }))
+vi.mock('../messaging/kick', () => ({ kickStayScheduler: async () => undefined }))
+vi.mock('../messaging/form-submitted', () => ({ notifyStayCreated: async () => undefined }))
 vi.mock('@/lib/whatsapp/send-message', () => ({ sendMessageToConversation: m.sendMessage }))
 
 import { findRelayAgent, forwardToResponder, onAgentMessage } from './server'
@@ -43,6 +45,29 @@ beforeEach(() => {
 
 const open = (text = 'Is parking free?', messageId = 'G1') =>
   openEscalation(db, { accountId: 'a', conversationId: 'c1', stayId: 's1', label: 'Asha (MS-2026-001)', preview: text, messageId, siteUrl: 'https://x.test', now: T0 })
+
+describe('Register New over WhatsApp', () => {
+  const FORM = 'Register\nName: Asha Rao\nMobile: 9876543210\nCheck-in: 25 Nov 2026 2:00 PM\nCheck-out: 27 Nov 2026 11:00 AM\nGuests: 2\nSource: direct'
+  const send = async (text: string) => onAgentMessage(db, { accountId: 'a', agent: (await findRelayAgent(db, 'a', '966500000002'))!, siteUrl: 'https://x.test', now: T0, msg: { id: 'R1', text, quotedId: null, hasMedia: false } })
+
+  it('"Register New" gets the form back, not a guest message', async () => {
+    expect(await send('Register New')).toBe('agent_register_form')
+    expect(sentTo('966500000002')[0]).toContain('Check-in: 25 Oct 2026 2:00 PM')
+    expect(m.sendMessage).not.toHaveBeenCalled()
+  })
+  it('a problem form creates nothing and lists what to fix', async () => {
+    expect(await send('Register\nName: Asha\nMobile: 9876543210\nCheck-in: someday\nCheck-out: 27 Nov 2026')).toBe('agent_register_failed')
+    expect(sentTo('966500000002')[0]).toContain('Check-in date')
+    expect(db.tables.stays).toHaveLength(1)
+  })
+  it('a good form creates the stay and confirms with the reference', async () => {
+    expect(await send(FORM)).toBe('agent_register_ok')
+    expect(db.tables.stays).toHaveLength(2)
+    expect(db.tables.stays[1]).toMatchObject({ guest_name: 'Asha Rao', guest_phone: '919876543210', created_by: 'care1', guests_count: 2, source: 'direct' })
+    expect(sentTo('966500000002')[0]).toContain('Registered')
+    expect(m.sendMessage).not.toHaveBeenCalled()
+  })
+})
 
 describe('guest message -> the agent\'s own WhatsApp', () => {
   it('the first agent gets the guest\'s message with the chat number, masked guest number and stay', async () => {

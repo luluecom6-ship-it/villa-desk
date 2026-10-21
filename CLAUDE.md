@@ -119,3 +119,8 @@ M3 channels + scheduler, M4 deposits + hardening, M5 Phase 2 (checklists, damage
   Form 2 of the Forms Pack (src/lib/stays/default-house-rules.ts); an admin reviews and presses Publish.
   Until then guests see "not open yet".
 - Stays UI strings are English in all four catalogues (es/pt/ko not translated yet).
+
+## Register New over WhatsApp (team)
+- Owner / admin / caretaker (a relay agent) sends **Register New** to the villa number -> bot replies with a labelled form (`REGISTER_TEMPLATE`). They fill it in and send it back (first line `Register`) -> stay created via `registerFromWhatsApp` (src/lib/stays/register/), confirmation with the Stay Reference; the guest form link goes out via the scheduler. Parsing is forgiving (dates, labels, source words, 10-digit mobile = +91); any problem -> nothing is created and the problems are listed.
+- Only plain text that is not a swipe-reply / #code. Deposits are NOT recordable from WhatsApp (owner/admin in the app).
+- POST /api/stays now allows `agent` (writes via service client); caretakers do not receive the form link in the response; New registration button shows for anyone who can send messages.
