@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import {
   CONVERSATION_SELECT,
@@ -14,7 +13,7 @@ import { ConversationList } from "@/components/inbox/conversation-list";
 import { MessageThread } from "@/components/inbox/message-thread";
 import { ContactSidebar } from "@/components/inbox/contact-sidebar";
 import { toast } from "sonner";
-import { WifiOff } from "lucide-react";
+import { WhatsAppBanner } from "@/components/settings/whatsapp-banner";
 import { cn } from "@/lib/utils";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
@@ -33,7 +32,6 @@ export default function InboxPage() {
 }
 
 function InboxPageInner() {
-  const t = useTranslations("Inbox.page");
   const router = useRouter();
   const searchParams = useSearchParams();
   /**
@@ -48,9 +46,6 @@ function InboxPageInner() {
     useState<Conversation | null>(null);
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [whatsappConnected, setWhatsappConnected] = useState<boolean | null>(
-    null
-  );
   /**
    * Bumped whenever we want children (ConversationList, MessageThread)
    * to refetch from the DB — used as a safety net against missed
@@ -172,45 +167,6 @@ function InboxPageInner() {
     }
   }, []);
 
-  // Check WhatsApp connection status on mount
-  useEffect(() => {
-    const checkConnection = async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
-
-      if (!user) return;
-
-      // whatsapp_config is one-row-per-account post-multi-user, so
-      // the previous `.eq('user_id', user.id)` would miss the row
-      // for any teammate who didn't personally save the config —
-      // the "WhatsApp not connected" banner would show in the
-      // shared inbox even though the admin had it configured.
-      // Resolve account_id via the profile and query by that.
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("account_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      const accountId = profile?.account_id as string | undefined;
-      if (!accountId) {
-        setWhatsappConnected(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("whatsapp_config")
-        .select("status")
-        .eq("account_id", accountId)
-        .maybeSingle();
-
-      setWhatsappConnected(data?.status === "connected");
-    };
-
-    checkConnection();
-  }, []);
 
   // Handle realtime message events
   const handleMessageEvent = useCallback(
@@ -563,16 +519,9 @@ function InboxPageInner() {
 
   return (
     <div className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-m-6">
-      {/* WhatsApp connection banner — in the flex column, not absolute,
-          so it pushes the panels down instead of overlapping them. */}
-      {whatsappConnected === false && (
-        <div className="flex shrink-0 items-center justify-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2">
-          <WifiOff className="h-4 w-4 text-amber-400" />
-          <p className="text-xs text-amber-400">
-            {t("whatsappNotConnected")}
-          </p>
-        </div>
-      )}
+      {/* Villa number problem (paused / logged out / not linked): admins only, hidden when all is well.
+          The old Meta "not connected" banner is gone: this app sends through the Evolution link. */}
+      <div className="shrink-0 px-3 empty:hidden"><WhatsAppBanner /></div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel: Conversation list.
