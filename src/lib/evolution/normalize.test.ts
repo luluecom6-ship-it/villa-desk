@@ -88,3 +88,14 @@ describe("statuses", () => {
     ]);
   });
 });
+
+describe('wrapped messages', () => {
+  it('unwraps a bot-forwarded message and reads the text inside', () => {
+    const r = normalizeUpsert({ key: { id: 'X1', remoteJid: '919000011111@s.whatsapp.net', fromMe: false }, message: { botForwardedMessage: { message: { conversation: 'hello there' } } } })
+    expect(r).toMatchObject({ kind: 'message', type: 'text', text: 'hello there' })
+  })
+  it('unwraps an edited message', () => {
+    const r = normalizeUpsert({ key: { id: 'X2', remoteJid: '919000011111@s.whatsapp.net', fromMe: false }, message: { editedMessage: { message: { conversation: 'fixed text' } } } })
+    expect(r).toMatchObject({ kind: 'message', type: 'text', text: 'fixed text' })
+  })
+})

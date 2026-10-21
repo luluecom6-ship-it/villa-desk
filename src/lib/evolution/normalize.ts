@@ -56,6 +56,8 @@ export function unwrapMessage(m: unknown): Obj {
       (isObj(cur.viewOnceMessageV2) && cur.viewOnceMessageV2.message) ||
       (isObj(cur.viewOnceMessageV2Extension) && cur.viewOnceMessageV2Extension.message) ||
       (isObj(cur.documentWithCaptionMessage) && cur.documentWithCaptionMessage.message) ||
+      (isObj(cur.botForwardedMessage) && cur.botForwardedMessage.message) ||
+      (isObj(cur.editedMessage) && cur.editedMessage.message) ||
       null;
     if (!isObj(inner)) break;
     cur = { ...inner, base64: cur.base64 ?? inner.base64 };
