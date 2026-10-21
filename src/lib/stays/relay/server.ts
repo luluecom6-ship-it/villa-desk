@@ -248,6 +248,8 @@ export interface AgentMessage {
   /** Its stored copy (null if it could not be downloaded). */
   mediaUrl?: string | null
   mediaType?: string | null
+  /** WhatsApp type we cannot read (the text is only a placeholder): never pass it on to a guest. */
+  unsupported?: boolean
 }
 
 async function openEscalationsOf(db: SupabaseClient, accountId: string, userId: string) {
@@ -295,6 +297,10 @@ export async function onAgentMessage(
 ): Promise<string> {
   const { accountId, agent, msg } = args
   const phone = agent.alertPhone as string
+  if (msg.unsupported) {
+    await tell(db, accountId, phone, '⚠️ Not sent: WhatsApp gave me a message type I cannot read, so the guest did not get it. Please type your answer as normal text.')
+    return 'agent_unsupported'
+  }
   let cmd = parseAgentMessage(msg.text)
   const react = async (emoji: string) => {
     try {

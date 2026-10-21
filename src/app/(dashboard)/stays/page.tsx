@@ -216,7 +216,7 @@ export default function StaysPage() {
                     <TableCell>
                       <div className="font-medium">{s.guest_name}</div>
                       <div className="mt-0.5">
-                        <StatusBadge status={s.status} />
+                        <StatusBadge status={s.status} checkoutAt={s.checkout_at} />
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm">
@@ -252,7 +252,7 @@ export default function StaysPage() {
                       <div className="truncate font-medium">{s.guest_name}</div>
                       <div className="font-mono text-xs text-muted-foreground">{s.stay_ref}</div>
                     </div>
-                    <StatusBadge status={s.status} />
+                    <StatusBadge status={s.status} checkoutAt={s.checkout_at} />
                   </div>
                   <div className="mt-2 text-sm">
                     {formatIst(s.checkin_at)} → {formatIst(s.checkout_at)}

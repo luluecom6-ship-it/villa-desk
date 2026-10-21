@@ -2737,7 +2737,8 @@
       "form_pending": "Form pending",
       "id_pending": "ID not verified",
       "cancelled": "Cancelled",
-      "deposit_refund": "Deposit to refund"
+      "deposit_refund": "Deposit to refund",
+      "checkout_due": "Check-out due"
     },
     "columns": {
       "reference": "Reference",
@@ -2761,7 +2762,8 @@
       "checked_in": "Checked in",
       "checked_out": "Checked out",
       "cancelled": "Cancelled",
-      "sample": "Sample"
+      "sample": "Sample",
+      "checkout_due": "Check-out due"
     },
     "automation": {
       "on": "On",

@@ -118,7 +118,7 @@ async function relayAgentMessage(ctx: ReceiveContext, agent: NonNullable<Awaited
     accountId: ctx.accountId,
     agent,
     siteUrl,
-    msg: { id: n.id, text: n.text, quotedId: n.quotedId, hasMedia: hasMediaType(n.type), mediaUrl: media.url, mediaType: media.mime },
+    msg: { id: n.id, text: n.text, quotedId: n.quotedId, hasMedia: hasMediaType(n.type), mediaUrl: media.url, mediaType: media.mime, unsupported: n.type === 'unknown' },
   })
 }
 

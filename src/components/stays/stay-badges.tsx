@@ -8,8 +8,16 @@ import type { AutomationState, IdStatus, StayStatus } from '@/lib/stays/types'
 
 const BASE = 'inline-flex items-center gap-1 whitespace-nowrap'
 
-export function StatusBadge({ status }: { status: StayStatus }) {
+export function StatusBadge({ status, checkoutAt }: { status: StayStatus; checkoutAt?: string }) {
   const t = useTranslations('Stays')
+  // Past check-out time but not marked checked out yet: say so instead of "Registered".
+  if (checkoutAt && (status === 'registered' || status === 'checked_in') && new Date(checkoutAt) <= new Date()) {
+    return (
+      <Badge variant="outline" className={cn(BASE, 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300')}>
+        {t('status.checkout_due')}
+      </Badge>
+    )
+  }
   const tone: Record<StayStatus, string> = {
     draft: 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300',
     registered: 'border-primary/40 bg-primary/10 text-primary',

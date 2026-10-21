@@ -12,6 +12,7 @@ export const STAY_FILTERS = [
   'arrivals_today',
   'departures_today',
   'in_house',
+  'checkout_due',
   'upcoming',
   'form_pending',
   'id_pending',
@@ -22,6 +23,11 @@ export type StayFilter = (typeof STAY_FILTERS)[number]
 
 export function isStayFilter(v: unknown): v is StayFilter {
   return typeof v === 'string' && (STAY_FILTERS as readonly string[]).includes(v)
+}
+
+/** Check-out time has passed but nobody has marked the stay checked out yet. */
+export function isCheckoutDue(stay: { status: string; checkout_at: string }, now: Date = new Date()): boolean {
+  return (stay.status === 'registered' || stay.status === 'checked_in') && new Date(stay.checkout_at) <= now
 }
 
 const DEAD = new Set(['cancelled', 'sample'])
@@ -58,6 +64,8 @@ export function matchesFilter(
         stay.status === 'checked_in' ||
         (stay.status === 'registered' && checkin <= now && now < checkout)
       )
+    case 'checkout_due':
+      return isCheckoutDue(stay, now)
     case 'upcoming':
       return (stay.status === 'draft' || stay.status === 'registered') && checkin > now
     case 'form_pending':

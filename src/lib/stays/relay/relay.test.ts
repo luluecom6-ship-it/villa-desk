@@ -287,4 +287,14 @@ describe('food order commands from the caretaker\'s WhatsApp', () => {
     expect(r).not.toBe('agent_order_none')
     expect(db.tables.food_orders[0].status).toBe('pending')
   })
+
+  it('a message type we cannot read is never passed to the guest as placeholder text', async () => {
+    const agent = (await findRelayAgent(db, 'a', '966500000002'))!
+    const before = m.sendText.mock.calls.length
+    const r = await onAgentMessage(db, { accountId: 'a', agent, msg: { id: 'U1', text: '[Unsupported message type: botForwardedMessage]', quotedId: null, hasMedia: false, unsupported: true }, siteUrl: '' })
+    expect(r).toBe('agent_unsupported')
+    const sent = m.sendText.mock.calls.slice(before).map((c: any) => c[2] as string)
+    expect(sent.some((t: string) => t.includes('Not sent'))).toBe(true)
+    expect(sent.some((t: string) => t.includes('Unsupported message type'))).toBe(false)
+  })
 })

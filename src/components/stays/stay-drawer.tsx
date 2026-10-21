@@ -256,7 +256,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
           <SheetHeader>
             <SheetTitle className="flex flex-wrap items-center gap-2">
               <span className="font-mono">{stay?.stay_ref ?? '…'}</span>
-              {stay && <StatusBadge status={stay.status} />}
+              {stay && <StatusBadge status={stay.status} checkoutAt={stay.checkout_at} />}
             </SheetTitle>
             <SheetDescription>{stay?.guest_name ?? t('drawer.loading')}</SheetDescription>
           </SheetHeader>

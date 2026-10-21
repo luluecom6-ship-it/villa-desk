@@ -288,6 +288,14 @@ describe('filters', () => {
     expect(matchesFilter(stay({ checkin_at: '2026-11-05T08:30:00Z', checkout_at: '2026-11-07T05:30:00Z' }), 'upcoming', NOW)).toBe(true)
     expect(matchesFilter(stay({}), 'upcoming', NOW)).toBe(false)
   })
+  it('check-out due: past check-out time but not marked checked out', () => {
+    const past = { checkin_at: '2026-10-28T08:30:00Z', checkout_at: '2026-10-30T05:30:00Z' }
+    expect(matchesFilter(stay(past), 'checkout_due', NOW)).toBe(true)
+    expect(matchesFilter(stay({ ...past, status: 'checked_in' }), 'checkout_due', NOW)).toBe(true)
+    expect(matchesFilter(stay({ ...past, status: 'checked_out' }), 'checkout_due', NOW)).toBe(false)
+    expect(matchesFilter(stay({ ...past, status: 'cancelled' }), 'checkout_due', NOW)).toBe(false)
+    expect(matchesFilter(stay({}), 'checkout_due', NOW)).toBe(false)
+  })
   it('form pending and ID not verified', () => {
     expect(matchesFilter(stay({}), 'form_pending', NOW)).toBe(true)
     expect(matchesFilter(stay({ form_status: 'submitted' }), 'form_pending', NOW)).toBe(false)
