@@ -371,7 +371,7 @@ export function StayDrawer({ stayId, isAdmin, onClose, onChanged }: Props) {
                               {g.full_name}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {g.role === 'lead' ? t('drawer.lead') : g.is_adult ? t('drawer.adult') : t('drawer.child')}
+                              {g.role === 'lead' ? t('drawer.lead') : g.age != null && g.age < 18 ? t('drawer.child') : t('drawer.adult')}
                             </span>
                           </div>
                           {(() => {

@@ -29,6 +29,7 @@ export interface StayGuestSummary {
   role: 'lead' | 'occupant'
   full_name: string
   is_adult: boolean
+  age?: number | null
   id_type: string | null
   id_last4: string | null
   id_verified_at: string | null

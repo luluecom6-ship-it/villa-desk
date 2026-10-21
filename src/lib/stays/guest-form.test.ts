@@ -174,13 +174,15 @@ describe('parseGuestForm', () => {
     const adult = { client_key: 'o1', full_name: 'Ravi', age: '34', id_type: 'passport', id_last4: 'X123' }
     const child = { client_key: 'o2', full_name: 'Mini', age: '7', id_type: '', id_last4: '' }
 
-    it('adults need ID type, last 4 and a front photo; children need none', () => {
+    it('every guest, children included, needs ID type, last 4 and a front photo (back optional)', () => {
+      const withId = { ...child, id_type: 'aadhaar', id_last4: '4321' }
       const r = parseGuestForm(
         form({
-          occupants: [adult, child],
+          occupants: [adult, withId],
           documents: [
             { guest_key: 'lead', side: 'front' },
             { guest_key: 'o1', side: 'front' },
+            { guest_key: 'o2', side: 'front' },
           ],
         }),
         ctx(),
@@ -188,14 +190,18 @@ describe('parseGuestForm', () => {
       expect(r.ok).toBe(true)
       if (r.ok) {
         expect(r.value.occupants[0]).toMatchObject({ is_adult: true, age: 34 })
-        expect(r.value.occupants[1]).toMatchObject({ is_adult: false, id_type: '', id_last4: '' })
+        expect(r.value.occupants[1]).toMatchObject({ age: 7, id_type: 'aadhaar', id_last4: '4321' })
       }
+      const noPhoto = parseGuestForm(form({ occupants: [withId], documents: [{ guest_key: 'lead', side: 'front' }] }), ctx())
+      expect(!noPhoto.ok && noPhoto.errors['documents.o2']).toBe('idPhotoRequired')
+      const noType = parseGuestForm(form({ occupants: [child], documents: [{ guest_key: 'lead', side: 'front' }, { guest_key: 'o2', side: 'front' }] }), ctx())
+      expect(!noType.ok && noType.errors['occupants.0.id_type']).toBe('idTypeRequired')
     })
-    it('derives adult from age 18, ignoring anything the browser claims', () => {
-      const r17 = parseGuestForm(form({ occupants: [{ ...adult, age: '17', is_adult: true }], documents: [{ guest_key: 'lead', side: 'front' }] }), ctx())
-      expect(r17.ok && r17.value.occupants[0]).toMatchObject({ is_adult: false })
-      const r18 = parseGuestForm(form({ occupants: [{ ...adult, age: '18' }], documents: [{ guest_key: 'lead', side: 'front' }] }), ctx())
-      expect(!r18.ok && r18.errors['documents.o1']).toBe('idPhotoRequired')
+    it('a 17-year-old and an 18-year-old are treated the same: both need an ID', () => {
+      for (const age of ['17', '18']) {
+        const r = parseGuestForm(form({ occupants: [{ ...adult, age }], documents: [{ guest_key: 'lead', side: 'front' }] }), ctx())
+        expect(!r.ok && r.errors['documents.o1']).toBe('idPhotoRequired')
+      }
     })
     it('an adult with no photo is rejected unless one is already on file', () => {
       const f = form({ occupants: [adult], documents: [{ guest_key: 'lead', side: 'front' }] })
@@ -217,16 +223,18 @@ describe('parseGuestForm', () => {
     })
     it('keeps the id of a previously saved person', () => {
       const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
-      const r = parseGuestForm(form({ occupants: [{ ...child, id }] }), ctx())
+      const kid = { ...child, id_type: 'aadhaar', id_last4: '4321' }
+      const docs = [{ guest_key: 'lead', side: 'front' }, { guest_key: 'o2', side: 'front' }]
+      const r = parseGuestForm(form({ occupants: [{ ...kid, id }], documents: docs }), ctx())
       expect(r.ok && r.value.occupants[0]).toMatchObject({ id })
-      const bad = parseGuestForm(form({ occupants: [{ ...child, id: 'not-a-uuid' }] }), ctx())
+      const bad = parseGuestForm(form({ occupants: [{ ...kid, id: 'not-a-uuid' }], documents: docs }), ctx())
       expect(!bad.ok && bad.errors['occupants.0.id']).toBe('badRequest')
     })
   })
 
   describe('documents', () => {
-    it('rejects files for children, unknown people and duplicates', () => {
-      const child = { client_key: 'o2', full_name: 'Mini', age: '7' }
+    it('rejects files for unknown people, duplicates and bad sides', () => {
+      const child = { client_key: 'o2', full_name: 'Mini', age: '7', id_type: 'aadhaar', id_last4: '4321' }
       const r = parseGuestForm(
         form({
           occupants: [child],
@@ -240,7 +248,7 @@ describe('parseGuestForm', () => {
         }),
         ctx(),
       )
-      expect(!r.ok && Object.keys(r.errors).filter((k) => k.startsWith('documents.')).length).toBe(4)
+      expect(!r.ok && Object.keys(r.errors).filter((k) => k.startsWith('documents.')).length).toBe(3)
     })
     it('allows a back side', () => {
       const r = parseGuestForm(form({ documents: [{ guest_key: 'lead', side: 'front' }, { guest_key: 'lead', side: 'back' }] }), ctx())
@@ -300,8 +308,8 @@ describe('Form 1 extra fields', () => {
     if (!half2.ok) expect(half2.errors['lead.emergency_name']).toBe('required')
   })
   it('keeps an extra guest mobile and rejects a bad one', () => {
-    const occ = { client_key: 'o1', full_name: 'Friend', age: 8 }
-    const ok = parseGuestForm(base({}, [{ ...occ, mobile: '98000 00003' }]), ctx)
+    const occ = { client_key: 'o1', full_name: 'Friend', age: 8, id_type: 'aadhaar', id_last4: '4321' }
+    const ok = parseGuestForm(base({}, [{ ...occ, mobile: '98000 00003' }]), { ...ctx, existingFronts: ['lead', 'o1'] })
     expect(ok.ok).toBe(true)
     if (ok.ok) expect(ok.value.occupants[0].mobile).toBe('9800000003')
     const bad = parseGuestForm(base({}, [{ ...occ, mobile: 'abc' }]), ctx)

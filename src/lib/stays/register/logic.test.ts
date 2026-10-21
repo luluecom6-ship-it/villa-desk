@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isRegisterRequest, looksLikeRegisterForm, parseLooseDateTime, parseRegisterMessage, parseSource, REGISTER_TEMPLATE } from './logic'
+import { parseGuests, readMobile, isRegisterRequest, looksLikeRegisterForm, parseLooseDateTime, parseRegisterMessage, parseSource, REGISTER_TEMPLATE } from './logic'
 
 const NOW = new Date('2026-10-21T06:00:00Z') // 21 Oct 2026, 11:30 IST
 const T = { h: 14, m: 0 }
@@ -55,12 +55,12 @@ Notes: late arrival`
     expect(looksLikeRegisterForm(FORM)).toBe(true)
     expect(parseRegisterMessage(FORM, NOW)).toEqual({
       ok: true,
-      body: { guest_name: 'Asha Rao', guest_phone: '98765 43210', checkin_at: '2026-10-25T14:00', checkout_at: '2026-10-27T11:00', guests_count: 3, source: 'airbnb', external_booking_ref: 'HMABCD1234', notes: 'late arrival', guest_email: '' },
+      body: { guest_name: 'Asha Rao', guest_phone: '919876543210', checkin_at: '2026-10-25T14:00', checkout_at: '2026-10-27T11:00', guests_count: 3, source: 'airbnb', external_booking_ref: 'HMABCD1234', notes: 'late arrival', guest_email: '' },
     })
   })
   it('is forgiving about label spelling, case and optional lines', () => {
     const r = parseRegisterMessage('register\nguest name - Ravi\nphone: +971501234567\ncheckin: 25 Oct\ncheckout: 26 Oct\npax: 2', NOW)
-    expect(r).toMatchObject({ ok: true, body: { guest_name: 'Ravi', guest_phone: '+971501234567', checkin_at: '2026-10-25T14:00', checkout_at: '2026-10-26T11:00', guests_count: 2, source: 'direct' } })
+    expect(r).toMatchObject({ ok: true, body: { guest_name: 'Ravi', guest_phone: '971501234567', checkin_at: '2026-10-25T14:00', checkout_at: '2026-10-26T11:00', guests_count: 2, source: 'direct' } })
   })
   it('lists every problem in plain words', () => {
     const r = parseRegisterMessage('Register\nName: \nMobile: 9876543210\nCheck-in: someday\nCheck-out: 25 Oct 2026\nGuests: 99\nSource: xyz', NOW)
@@ -76,5 +76,25 @@ Notes: late arrival`
   it('the template itself is not a valid form until it is filled in', () => {
     expect(looksLikeRegisterForm(REGISTER_TEMPLATE)).toBe(true)
     expect(parseRegisterMessage(REGISTER_TEMPLATE, NOW).ok).toBe(false)
+  })
+})
+
+describe('mobile and guests', () => {
+  it('Indian = 10 digits; foreign needs +; a long number without + is refused', () => {
+    expect(readMobile('98765 43210')).toBe('919876543210')
+    expect(readMobile('+91 98765 43210')).toBe('919876543210')
+    expect(readMobile('+966572657189')).toBe('966572657189')
+    expect(readMobile('966572657189')).toBeNull()
+    expect(readMobile('12345')).toBeNull()
+  })
+  it('adults + kids', () => {
+    expect(parseGuests('2 adult + 1 Kid')).toEqual({ adults: 2, kids: 1, total: 3 })
+    expect(parseGuests('2 + 1')).toEqual({ adults: 2, kids: 1, total: 3 })
+    expect(parseGuests('4')).toEqual({ adults: 4, kids: 0, total: 4 })
+    expect(parseGuests('21 xyz')).toBeNull()
+  })
+  it('the reported message now registers 3 guests and keeps the kid note', () => {
+    const r = parseRegisterMessage('Register\nName: NewGuestTest\nMobile: +966572657189\nCheck-in : 22 Oct 2026 2:00PM\nCheck-out: 27 Oct 2026 11:00AM\nGuest: 2 adult + 1 Kid\nSource: airbnb\nBooking ref: airbnb12309\nNotes: blank', NOW)
+    expect(r).toMatchObject({ ok: true, body: { guest_phone: '966572657189', guests_count: 3, notes: '2 adults + 1 kid', source: 'airbnb' } })
   })
 })

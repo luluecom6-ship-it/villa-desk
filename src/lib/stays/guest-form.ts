@@ -212,7 +212,9 @@ export function parseGuestForm(raw: unknown, ctx: ParseContext): GuestFormResult
     const occMobile = phone(o.mobile)
     if (!occMobile.ok) errors[`${p}.mobile`] = 'invalidPhone'
 
-    const adult = Number.isInteger(age) && ageText !== '' && isAdultAge(age)
+    // Owner decision 21 Oct 2026: every guest, children included, gives an ID type, last 4 and a front photo (back optional).
+    // `is_adult` therefore means "an ID is required" (true for everyone with a valid age); the real age is stored as `age`.
+    const adult = Number.isInteger(age) && ageText !== ''
     let id_type = ''
     let id_last4 = ''
     if (adult) {

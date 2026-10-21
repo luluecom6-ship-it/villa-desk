@@ -8,7 +8,7 @@ import type { StayWithGuests } from './types'
 
 /** Columns the dashboard needs from stay_guests (never ID image data). */
 export const GUEST_COLUMNS =
-  'id, role, full_name, is_adult, id_type, id_last4, id_verified_at, id_rejected_at, is_foreign, form_c_required'
+  'id, role, full_name, age, is_adult, id_type, id_last4, id_verified_at, id_rejected_at, is_foreign, form_c_required'
 
 /** Public guest-form link for a stay. Origin: NEXT_PUBLIC_SITE_URL, else the request's. */
 export function stayFormUrl(requestUrl: string, token: string): string {

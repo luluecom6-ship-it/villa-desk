@@ -66,7 +66,7 @@ export async function registerFromWhatsApp(
         `Guest: ${data.guest_name} (+${data.guest_phone})`,
         `Check-in: ${IST(data.checkin_at)}`,
         `Check-out: ${IST(data.checkout_at)}`,
-        `Guests: ${data.guests_count} · Source: ${data.source}`,
+        `Guests: ${data.guests_count}${(data.notes ?? '').match(/^\d+ adults? \+ \d+ kids?/)?.[0] ? ` (${(data.notes as string).match(/^\d+ adults? \+ \d+ kids?/)![0]})` : ''} · Source: ${data.source}`,
         '',
         'The guest form link is being sent to the guest now.',
       ].join('\n'),

@@ -20,13 +20,15 @@ export const REGISTER_TEMPLATE = [
   'Mobile: ',
   'Check-in: 25 Oct 2026 2:00 PM',
   'Check-out: 27 Oct 2026 11:00 AM',
-  'Guests: 2',
+  'Guests: 2 adults + 1 kid',
   'Source: direct',
   'Booking ref: ',
   'Notes: ',
   '',
   'Source can be: airbnb, booking, makemytrip, goibibo, direct or other.',
-  'Booking ref and Notes are optional. A 10-digit mobile is taken as an Indian (+91) number; for any other country write the full number with the country code, e.g. 966572657189.',
+  'Mobile: an Indian number is just the 10 digits, e.g. 9876543210. For any other country write + and the country code, e.g. +966572657189.',
+  'Guests: adults + kids, e.g. 2 + 1 (or 2 adults + 1 kid). Write 3 if there are no kids.',
+  'Booking ref and Notes are optional (leave blank).',
 ].join('\n')
 
 const LABELS: Array<[string, RegExp]> = [
@@ -137,6 +139,46 @@ export function parseSource(raw: string): StaySource | null {
   return SOURCE_WORDS.find(([re]) => re.test(t))?.[1] ?? null
 }
 
+/** "blank", "none", "nil", "-" and "na" mean nothing was written. */
+export function blankToEmpty(v: string): string {
+  const t = v.trim()
+  return /^(blank|none|nil|na|n\/a|-+|no)$/i.test(t) ? '' : t
+}
+
+/**
+ * Indian numbers are the 10 digits (a leading 0, 91 or +91 is fine); any other country needs "+" and the country code.
+ * A long number with no "+" is refused rather than guessed (966572657189 must not become +91966572657189).
+ */
+export function readMobile(raw: string): string | null {
+  const t = raw.trim()
+  const digits = t.replace(/\D/g, '')
+  if (t.startsWith('+') || t.startsWith('00')) {
+    const d = t.startsWith('00') ? digits.slice(2) : digits
+    return /^[1-9]\d{7,14}$/.test(d) ? d : null
+  }
+  const national = digits.replace(/^0+/, '')
+  if (national.length === 10) return `91${national}`
+  if (national.length === 12 && national.startsWith('91')) return national
+  return null
+}
+
+/** "2 + 1", "2 adults + 1 kid", "2 adult 1 child", "3" -> adults / kids / total. */
+export function parseGuests(raw: string): { adults: number; kids: number; total: number } | null {
+  const t = raw.trim().toLowerCase()
+  if (!t) return { adults: 1, kids: 0, total: 1 }
+  const kidWord = /(\d+)\s*(kids?|child(?:ren)?|infants?|babies|baby)/.exec(t)
+  const adultWord = /(\d+)\s*(adults?|men|women|persons?|people|pax)/.exec(t)
+  if (kidWord || adultWord) {
+    const adults = adultWord ? Number(adultWord[1]) : 0
+    const kids = kidWord ? Number(kidWord[1]) : 0
+    return { adults, kids, total: adults + kids }
+  }
+  const nums = t.match(/\d+/g)?.map(Number) ?? []
+  if (nums.length === 1 && /^\d+$/.test(t)) return { adults: nums[0], kids: 0, total: nums[0] }
+  if (nums.length === 2 && /^\d+\s*\+\s*\d+$/.test(t)) return { adults: nums[0], kids: nums[1], total: nums[0] + nums[1] }
+  return null
+}
+
 export type RegisterParse =
   | { ok: true; body: { guest_name: string; guest_phone: string; checkin_at: string; checkout_at: string; guests_count: number; source: StaySource; external_booking_ref: string; notes: string; guest_email: string } }
   | { ok: false; problems: string[] }
@@ -149,7 +191,9 @@ export function parseRegisterMessage(text: string, now: Date = new Date()): Regi
   const name = (f.name ?? '').trim()
   if (!name) problems.push('Name is missing.')
   const mobile = (f.mobile ?? '').trim()
+  const phone = mobile ? readMobile(mobile) : null
   if (!mobile) problems.push('Mobile is missing.')
+  else if (!phone) problems.push('Mobile not understood. An Indian number is just the 10 digits; for any other country write + and the country code, e.g. +966572657189.')
 
   const checkin = parseLooseDateTime(f.checkin ?? '', now, { h: 14, m: 0 })
   const checkout = parseLooseDateTime(f.checkout ?? '', now, { h: 11, m: 0 })
@@ -157,11 +201,10 @@ export function parseRegisterMessage(text: string, now: Date = new Date()): Regi
   if (!checkout) problems.push('Check-out date is missing or not understood. Write it like: 27 Oct 2026 11:00 AM')
   if (checkin && checkout && checkout <= checkin) problems.push('Check-out must be after check-in.')
 
-  let guests = 1
-  if ((f.guests ?? '').trim()) {
-    guests = Number((f.guests ?? '').replace(/\D/g, ''))
-    if (!Number.isInteger(guests) || guests < 1 || guests > 30) problems.push('Guests must be a number from 1 to 30.')
-  }
+  const party = parseGuests(f.guests ?? '')
+  if (!party) problems.push('Guests not understood. Write adults + kids, e.g. 2 + 1 (or 2 adults + 1 kid).')
+  else if (party.total < 1 || party.total > 30) problems.push('Guests must be from 1 to 30 in total.')
+  const guests = party?.total ?? 1
   const source = parseSource(f.source ?? '')
   if (!source) problems.push('Source must be one of: airbnb, booking, makemytrip, goibibo, direct, other.')
 
@@ -170,14 +213,14 @@ export function parseRegisterMessage(text: string, now: Date = new Date()): Regi
     ok: true,
     body: {
       guest_name: name,
-      guest_phone: mobile,
+      guest_phone: phone as string,
       checkin_at: checkin,
       checkout_at: checkout,
       guests_count: guests,
       source,
-      external_booking_ref: (f.ref ?? '').trim(),
-      notes: (f.notes ?? '').trim(),
-      guest_email: (f.email ?? '').trim(),
+      external_booking_ref: blankToEmpty(f.ref ?? ''),
+      notes: [party && party.kids > 0 ? `${party.adults} adult${party.adults === 1 ? '' : 's'} + ${party.kids} kid${party.kids === 1 ? '' : 's'}` : '', blankToEmpty(f.notes ?? '')].filter(Boolean).join('. '),
+      guest_email: blankToEmpty(f.email ?? ''),
     },
   }
 }
